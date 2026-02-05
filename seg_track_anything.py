@@ -9,6 +9,15 @@ import gc
 import imageio
 from scipy.ndimage import binary_dilation
 
+def save_gif(path, frames, fps):
+    try:
+        imageio.mimsave(path, frames, fps=fps)
+        return
+    except TypeError as e:
+        if "fps" not in str(e) or "duration" not in str(e):
+            raise
+    imageio.mimsave(path, frames, duration=1000 / fps)
+
 def save_prediction(pred_mask,output_dir,file_name):
     save_mask = Image.fromarray(pred_mask.astype(np.uint8))
     save_mask = save_mask.convert(mode='P')
@@ -215,7 +224,7 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     print('\nfinished')
 
     # save colorized masks as a gif
-    imageio.mimsave(io_args['output_gif'], masked_pred_list, duration=1000 / fps)
+    save_gif(io_args['output_gif'], masked_pred_list, fps)
     print("{} saved".format(io_args['output_gif']))
 
     # zip predicted mask
@@ -331,7 +340,7 @@ def img_seq_type_input_tracking(SegTracker, io_args, video_name, imgs_path, fps,
     print('\nfinished')
 
     # save colorized masks as a gif
-    imageio.mimsave(io_args['output_gif'], masked_pred_list, fps=fps)
+    save_gif(io_args['output_gif'], masked_pred_list, fps)
     print("{} saved".format(io_args['output_gif']))
 
     # zip predicted mask
