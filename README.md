@@ -135,16 +135,7 @@ bash script/install.sh
 
 3. SAM vit_h: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
 
-**- Download DEAOT/AOT model to ckpt folder for running the code**
-
-| Model      | Param (M) |                                             PRE_YTB_DAV                                      |                                              
-|:---------- |:---------:|:--------------------------------------------------------------------------------------------:|
-| AOTT       |    5.7    | [gdrive](https://drive.google.com/file/d/1owPmwV4owd_ll6GuilzklqTyAd0ZvbCu/view?usp=sharing) |
-| AOTS       |    7.0    | [gdrive](https://drive.google.com/file/d/1beU5E6Mdnr_pPrgjWvdWurKAIwJSz1xf/view?usp=sharing) |
-| AOTB       |    8.3    | [gdrive](https://drive.google.com/file/d/1hH-GOn4GAxHkV8ARcQzsUy8Ax6ndot-A/view?usp=sharing) |
-| AOTL       |    8.3    | [gdrive](https://drive.google.com/file/d/1L1N2hkSPqrwGgnW9GyFHuG59_EYYfTG4/view?usp=sharing) |
-| R50-AOTL   |   14.9    | [gdrive](https://drive.google.com/file/d/1qJDYn3Ibpquu4ffYoQmVjg1YCbr2JQep/view?usp=sharing) |
-| SwinB-AOTL |   65.4    | [gdrive](https://drive.google.com/file/d/192jCGQZdnuTsvX-CVra-KVZl2q1ZR0vW/view?usp=sharing) |
+**- Download DEAOT model to ckpt folder for running the code**
 
 | Model      | Param (M) |                                             PRE_YTB_DAV                                        |     
 |:---------- |:---------:|:--------------------------------------------------------------------------------------------:  |

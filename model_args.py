@@ -17,52 +17,41 @@ def infer_sam_type(path):
         return "vit_b"
     raise ValueError("Unknown SAM model type in filename")
 
-def find_aot_checkpoint(folder="ckpt"):
-    files = glob.glob(os.path.join(folder, "*.pth"))
+def find_deaot_checkpoint(folder="ckpt"):
+    files = glob.glob(os.path.join(folder, "*deaot*pre_ytb_dav*.pth"))
 
-    valid = []
-    for f in files:
-        name = os.path.basename(f).lower()
-
-        if "pre_ytb_dav" not in name:
-            continue
-
-        if "aot" in name:  # covers aot + deaot
-            valid.append(f)
-
-    if not valid:
+    if not files:
         raise FileNotFoundError(
-            "No valid PRE_YTB_DAV AOT/DeAOT checkpoint found in ./ckpt"
+            "No DeAOT PRE_YTB_DAV checkpoint found in ./ckpt"
         )
+    return files[0]
 
-    return valid[0]
-
-def infer_aot_model(path):
+def infer_deaot_model(path):
     name = os.path.basename(path).lower()
-    prefix = "deaot" if "deaot" in name else "aot"
-    # detect size tier
-    if "aott" in name:
-        size = "t"
-    elif "aots" in name:
-        size = "s"
-    elif "aotb" in name:
-        size = "b"
-    elif "aotl" in name:
-        size = "l"
-    else:
-        size = "l" 
 
-    # detect backbone
-    if "r50" in name:
-        backbone = "r50"
-    elif "swin" in name:
+    # backbone
+    if "swin" in name:
         backbone = "swinb"
     else:
-        backbone = "r50" 
-    return f"{backbone}_{prefix}{size}"
+        backbone = "r50"
+
+    # size
+    if "deaott" in name:
+        size = "t"
+    elif "deaots" in name:
+        size = "s"
+    elif "deaotb" in name:
+        size = "b"
+    elif "deaotl" in name:
+        size = "l"
+    else:
+        raise ValueError(f"Unknown DeAOT size in filename: {name}")
+
+    return f"{backbone}_deaot{size}"
+
 
 sam_ckpt = find_sam_checkpoint()
-aot_ckpt = find_aot_checkpoint()
+aot_ckpt = find_deaot_checkpoint()
 
 sam_args = {
     'sam_checkpoint': sam_ckpt,
@@ -79,7 +68,7 @@ sam_args = {
 }
 aot_args = {
     'phase': 'PRE_YTB_DAV',
-    "model": infer_aot_model(aot_ckpt),
+    "model": infer_deaot_model(aot_ckpt),
     "model_path": aot_ckpt,
     'long_term_mem_gap': 9999,
     'max_len_long_term': 9999,
