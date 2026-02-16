@@ -1,6 +1,6 @@
 # Install SAM
 cd sam; pip install -e .
-cd -
+cd ..
 
 # Install Grounding-Dino
 pip install -e git+https://github.com/IDEA-Research/GroundingDINO.git@main#egg=GroundingDINO
@@ -15,8 +15,8 @@ pip install glob
 # Install Pytorch Correlation
 git clone https://github.com/ClementPinard/Pytorch-Correlation-extension.git
 cd Pytorch-Correlation-extension
-python setup.py install
-cd -
+pip install .
+cd ..
 
 # Install AST
 git clone https://github.com/YuanGongND/ast.git ast_master
