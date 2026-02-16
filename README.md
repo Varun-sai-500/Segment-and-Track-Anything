@@ -126,18 +126,59 @@ bash script/install.sh
 ```
 
 ### :star:Model Preparation
-Download SAM model to ckpt, the default model is SAM-VIT-B ([sam_vit_b_01ec64.pth](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth)).
 
-Download DeAOT/AOT model to ckpt, the default model is R50-DeAOT-L ([R50_DeAOTL_PRE_YTB_DAV.pth](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view)).
+- Download the SAM model to ckpt folder for running the code
 
-Download Grounding-Dino model to ckpt, the default model is GroundingDINO-T ([groundingdino_swint_ogc](https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth)).
+1. SAM vit_b (default) : https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
 
-Download AST model to ast_master/pretrained_models, the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
+2. SAM vit_l: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth
 
-You can download the default weights using the command line as shown below.
-```
-bash script/download_ckpt.sh
-```
+3. SAM vit_h: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
+
+- Download DEAOT/AOT model to ckpt folder for running the code
+
+| Model      | Param (M) |                                             PRE_YTB_DAV                                      |                                              
+|:---------- |:---------:|:--------------------------------------------------------------------------------------------:|
+| AOTT       |    5.7    | [gdrive](https://drive.google.com/file/d/1owPmwV4owd_ll6GuilzklqTyAd0ZvbCu/view?usp=sharing) |
+| AOTS       |    7.0    | [gdrive](https://drive.google.com/file/d/1beU5E6Mdnr_pPrgjWvdWurKAIwJSz1xf/view?usp=sharing) |
+| AOTB       |    8.3    | [gdrive](https://drive.google.com/file/d/1hH-GOn4GAxHkV8ARcQzsUy8Ax6ndot-A/view?usp=sharing) |
+| AOTL       |    8.3    | [gdrive](https://drive.google.com/file/d/1L1N2hkSPqrwGgnW9GyFHuG59_EYYfTG4/view?usp=sharing) |
+| R50-AOTL   |   14.9    | [gdrive](https://drive.google.com/file/d/1qJDYn3Ibpquu4ffYoQmVjg1YCbr2JQep/view?usp=sharing) |
+| SwinB-AOTL |   65.4    | [gdrive](https://drive.google.com/file/d/192jCGQZdnuTsvX-CVra-KVZl2q1ZR0vW/view?usp=sharing) |
+
+| Model      | Param (M) |                                             PRE_YTB_DAV                                        |     
+|:---------- |:---------:|:--------------------------------------------------------------------------------------------:  |
+| DeAOTT       |    7.2    | [gdrive](https://drive.google.com/file/d/1ThWIZQS03cYWx1EKNN8MIMnJS5eRowzr/view?usp=sharing) |
+| DeAOTS       |    10.2   | [gdrive](https://drive.google.com/file/d/1YwIAV5tBtn5spSFxKLBQBEQGwPHyQlHi/view?usp=sharing) |
+| DeAOTB       |    13.2   | [gdrive](https://drive.google.com/file/d/1BHxsonnvJXylqHlZ1zJHHc-ymKyq-CFf/view?usp=sharing) |
+| DeAOTL       |    13.2   | [gdrive](https://drive.google.com/file/d/18elNz_wi9JyVBcIUYKhRdL08MA-FqHD5/view?usp=sharing) |
+| R50-DeAOTL   |    19.8   | [gdrive](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view?usp=sharing) |
+| SwinB-DeAOTL |    70.3   | [gdrive](https://drive.google.com/file/d/1g4E-F0RPOx9Nd6J7tU9AE1TjsouL4oZq/view?usp=sharing) |
+
+Download Grounding-DINO model to ckpt folder
+## 📦 Model Checkpoints
+
+| Name | Backbone | Training Data | Box AP (COCO) | Checkpoint | 
+|------|----------|---------------|---------------|------------|
+| GroundingDINO-T | Swin-T | O365, GoldG, Cap4M | 48.4 (zero-shot) / 57.2 (fine-tuned) | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth) | 
+| GroundingDINO-B | Swin-B | COCO, O365, GoldG, Cap4M, OpenImages, ODinW-35, RefCOCO | 56.7 | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha2/groundingdino_swinb_cogcoor.pth) | 
+
+
+Download AST model to ast_master/pretrained_models, after cloning the AST repository
+
+## Pretrained Models
+We provide full AudioSet pretrained models and Speechcommands-V2-35 pretrained model.
+1. [Full AudioSet, 10 tstride, 10 fstride, with Weight Averaging (0.459 mAP)](https://www.dropbox.com/s/ca0b1v2nlxzyeb4/audioset_10_10_0.4593.pth?dl=1)
+2. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 1 (0.450 mAP)](https://www.dropbox.com/s/1tv0hovue1bxupk/audioset_10_10_0.4495.pth?dl=1)
+3. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 2  (0.448 mAP)](https://www.dropbox.com/s/6u5sikl4b9wo4u5/audioset_10_10_0.4483.pth?dl=1)
+4. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 3  (0.448 mAP)](https://www.dropbox.com/s/kt6i0v9fvfm1mbq/audioset_10_10_0.4475.pth?dl=1)
+5. [Full AudioSet, 12 tstride, 12 fstride, without Weight Averaging, Model (0.447 mAP)](https://www.dropbox.com/s/snfhx3tizr4nuc8/audioset_12_12_0.4467.pth?dl=1)
+6. [Full AudioSet, 14 tstride, 14 fstride, without Weight Averaging, Model (0.443 mAP)](https://www.dropbox.com/s/z18s6pemtnxm4k7/audioset_14_14_0.4431.pth?dl=1)
+7. [Full AudioSet, 16 tstride, 16 fstride, without Weight Averaging, Model (0.442 mAP)](https://www.dropbox.com/s/mdsa4t1xmcimia6/audioset_16_16_0.4422.pth?dl=1)
+
+8. [Speechcommands V2-35, 10 tstride, 10 fstride, without Weight Averaging, Model (98.12% accuracy on evaluation set)](https://www.dropbox.com/s/q0tbqpwv44pquwy/speechcommands_10_10_0.9812.pth?dl=1)
+ the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
+
 
 ### :heart:Run Demo
 - The video to be processed can be put in ./assets. 
