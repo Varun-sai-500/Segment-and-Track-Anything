@@ -10,6 +10,7 @@ pip install numpy opencv-python pycocotools matplotlib Pillow==9.2.0 scikit-imag
 pip install gradio==3.39.0 zip gdown ffmpeg==1.4
 pip install timm==0.4.5
 pip install wget
+pip install glob 
 
 # Install Pytorch Correlation
 git clone https://github.com/ClementPinard/Pytorch-Correlation-extension.git

@@ -1,4 +1,6 @@
 import torch
+import glob
+import os
 import numpy as np
 import cv2
 import PIL
@@ -11,10 +13,27 @@ import groundingdino.datasets.transforms as T
 
 from torchvision.ops import box_convert
 
+
 class Detector:
+
+    def find_dino_checkpoint(folder="ckpt"):
+        files = sorted(glob.glob(os.path.join(folder, "groundingdino*.pth")))
+        if not files:
+            raise FileNotFoundError("No GroundingDINO checkpoint found in ./ckpt")
+        return files[0]
+    
+    def infer_dino_config(ckpt_path):
+        name = ckpt_path.lower()
+        if "swint" in name:
+            return "src/groundingdino/groundingdino/config/GroundingDINO_SwinT_OGC.py"
+        if "swinb" in name:
+            return "src/groundingdino/groundingdino/config/GroundingDINO_SwinB_cfg.py"
+
+        raise ValueError(f"Unknown GroundingDINO model type from filename: {ckpt_path}")
+
     def __init__(self, device):
-        config_file = "src/groundingdino/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-        grounding_dino_ckpt = './ckpt/groundingdino_swint_ogc.pth'
+        grounding_dino_ckpt = find_dino_checkpoint()
+        config_file = infer_dino_config(grounding_dino_ckpt)
         args = SLConfig.fromfile(config_file) 
         args.device = device
         self.deivce = device

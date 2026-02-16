@@ -127,7 +127,7 @@ bash script/install.sh
 
 ### :star:Model Preparation
 
-- Download the SAM model to ckpt folder for running the code
+**- Download the SAM model to ckpt folder for running the code**
 
 1. SAM vit_b (default) : https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
 
@@ -135,7 +135,7 @@ bash script/install.sh
 
 3. SAM vit_h: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
 
-- Download DEAOT/AOT model to ckpt folder for running the code
+**- Download DEAOT/AOT model to ckpt folder for running the code**
 
 | Model      | Param (M) |                                             PRE_YTB_DAV                                      |                                              
 |:---------- |:---------:|:--------------------------------------------------------------------------------------------:|
@@ -155,8 +155,7 @@ bash script/install.sh
 | R50-DeAOTL   |    19.8   | [gdrive](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view?usp=sharing) |
 | SwinB-DeAOTL |    70.3   | [gdrive](https://drive.google.com/file/d/1g4E-F0RPOx9Nd6J7tU9AE1TjsouL4oZq/view?usp=sharing) |
 
-Download Grounding-DINO model to ckpt folder
-## 📦 Model Checkpoints
+**Download Grounding-DINO model to ckpt folder**
 
 | Name | Backbone | Training Data | Box AP (COCO) | Checkpoint | 
 |------|----------|---------------|---------------|------------|
@@ -166,8 +165,6 @@ Download Grounding-DINO model to ckpt folder
 
 Download AST model to ast_master/pretrained_models, after cloning the AST repository
 
-## Pretrained Models
-We provide full AudioSet pretrained models and Speechcommands-V2-35 pretrained model.
 1. [Full AudioSet, 10 tstride, 10 fstride, with Weight Averaging (0.459 mAP)](https://www.dropbox.com/s/ca0b1v2nlxzyeb4/audioset_10_10_0.4593.pth?dl=1)
 2. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 1 (0.450 mAP)](https://www.dropbox.com/s/1tv0hovue1bxupk/audioset_10_10_0.4495.pth?dl=1)
 3. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 2  (0.448 mAP)](https://www.dropbox.com/s/6u5sikl4b9wo4u5/audioset_10_10_0.4483.pth?dl=1)
@@ -178,6 +175,11 @@ We provide full AudioSet pretrained models and Speechcommands-V2-35 pretrained m
 
 8. [Speechcommands V2-35, 10 tstride, 10 fstride, without Weight Averaging, Model (98.12% accuracy on evaluation set)](https://www.dropbox.com/s/q0tbqpwv44pquwy/speechcommands_10_10_0.9812.pth?dl=1)
  the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
+
+You can download the **default weights** using the command line as shown below.
+$$
+bash script/download_ckpt.sh
+$$
 
 
 ### :heart:Run Demo
