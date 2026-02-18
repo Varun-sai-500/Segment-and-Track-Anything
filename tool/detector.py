@@ -18,7 +18,7 @@ class Detector:
     @staticmethod
     def find_dino_checkpoint():
         base = os.path.dirname(os.path.abspath(__file__))  # folder where detector.py lives
-        root = os.path.abspath(os.path.join(base, "..", ".."))  # go up to project root
+        root = os.path.abspath(os.path.join(base, ".."))  # go up to project root
         folder = os.path.join(root, "ckpt")
 
         files = sorted(glob.glob(os.path.join(folder, "groundingdino*.pth")))
@@ -29,7 +29,7 @@ class Detector:
     @staticmethod
     def infer_dino_config(ckpt_path):
         base = os.path.dirname(os.path.abspath(__file__))
-        root = os.path.abspath(os.path.join(base, "..", ".."))
+        root = os.path.abspath(os.path.join(base, ".."))
 
         name = os.path.basename(ckpt_path).lower()
 
