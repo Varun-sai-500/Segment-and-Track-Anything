@@ -15,35 +15,46 @@ from torchvision.ops import box_convert
 
 
 class Detector:
+    @staticmethod
+    def find_dino_checkpoint():
+        base = os.path.dirname(os.path.abspath(__file__))  # folder where detector.py lives
+        root = os.path.abspath(os.path.join(base, "..", ".."))  # go up to project root
+        folder = os.path.join(root, "ckpt")
 
-    def find_dino_checkpoint(folder="ckpt"):
         files = sorted(glob.glob(os.path.join(folder, "groundingdino*.pth")))
         if not files:
-            raise FileNotFoundError("No GroundingDINO checkpoint found in ./ckpt")
+            raise FileNotFoundError(f"No checkpoint found in {folder}")
         return files[0]
     
+    @staticmethod
     def infer_dino_config(ckpt_path):
-        name = ckpt_path.lower()
+        base = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.abspath(os.path.join(base, "..", ".."))
+
+        name = os.path.basename(ckpt_path).lower()
+
         if "swint" in name:
-            return "src/groundingdino/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-        if "swinb" in name:
-            return "src/groundingdino/groundingdino/config/GroundingDINO_SwinB_cfg.py"
+            cfg = "GroundingDINO_SwinT_OGC.py"
+        elif "swinb" in name:
+            cfg = "GroundingDINO_SwinB_cfg.py"
+        else:
+            raise ValueError(f"Unknown GroundingDINO model type: {ckpt_path}")
 
-        raise ValueError(f"Unknown GroundingDINO model type from filename: {ckpt_path}")
-
+        return os.path.join(root, "src", "groundingdino", "groundingdino", "config", cfg)
+    
     def __init__(self, device):
-        grounding_dino_ckpt = find_dino_checkpoint()
-        config_file = infer_dino_config(grounding_dino_ckpt)
+        grounding_dino_ckpt = self.find_dino_checkpoint()
+        config_file = self.infer_dino_config(grounding_dino_ckpt)
         args = SLConfig.fromfile(config_file) 
         args.device = device
-        self.deivce = device
+        self.device = device
         self.gd = build_grounding_dino(args)
 
         checkpoint = torch.load(grounding_dino_ckpt, map_location='cpu')
         log = self.gd.load_state_dict(clean_state_dict(checkpoint['model']), strict=False)
         print("Model loaded from {} \n => {}".format(grounding_dino_ckpt, log))
         self.gd.eval()
-    
+        
     def image_transform_grounding(self, init_image):
         transform = T.Compose([
             T.RandomResize([800], max_size=1333),
@@ -92,7 +103,7 @@ class Detector:
         # img_pil = self.image_transform_grounding_for_vis(img_pil)
 
         # run grounidng
-        boxes, logits, phrases = predict(self.gd, image_tensor, grounding_caption, box_threshold, text_threshold, device=self.deivce)
+        boxes, logits, phrases = predict(self.gd, image_tensor, grounding_caption, box_threshold, text_threshold, device=self.device)
         annotated_frame = annotate(image_source=np.asarray(img_pil), boxes=boxes, logits=logits, phrases=phrases)[:, :, ::-1]
         annotated_frame = cv2.resize(annotated_frame, (width, height), interpolation=cv2.INTER_LINEAR)
         
