@@ -1,8 +1,12 @@
 import torch
 
-def generate_permute_matrix(dim, num, keep_first=True, device=None):
+def generate_permute_matrix(dim, num, keep_first=True, device=None, gpu_id=None):
+    # Backward-compatible path: existing callers may still pass gpu_id=...
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if gpu_id is not None and torch.cuda.is_available():
+            device = torch.device(f"cuda:{gpu_id}")
+        else:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     all_matrix = []
     for _ in range(num):
