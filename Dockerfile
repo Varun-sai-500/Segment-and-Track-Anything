@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.12.2-cuda13.0-cudnn8-devel
+FROM pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_HOME=/usr/local/cuda
@@ -9,7 +9,6 @@ RUN apt-get update && \
     cmake \
     git \
     ffmpeg \
-    wget \
     curl \
     ca-certificates \
     python3-dev && \
@@ -29,9 +28,6 @@ Pillow==12.3.0 \
 gradio==6.20.0 \
 gdown==6.1.0
 
-RUN git clone https://github.com/facebookresearch/segment-anything sam
-RUN pip install .
-
-WORKDIR /workspace
+RUN pip install git+https://github.com/facebookresearch/segment-anything.git
 
 CMD ["python", "app.py"]

@@ -5,10 +5,8 @@ python -m pip install --upgrade pip
 
 # Install SAM
 pip install git+https://github.com/facebookresearch/segment-anything
-cd sam; python -m pip install .
-cd ..
 
-# or git clone https://github.com/facebookresearch/segment-anything and pip install -e .
+# or git clone https://github.com/facebookresearch/segment-anything and cd sam and pip install -e .
 
 # If your CUDA version is different, use the matching command from:
 # https://pytorch.org/get-started/locally/
