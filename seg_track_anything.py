@@ -1,8 +1,7 @@
 import os
 import cv2
-from model_args import segtracker_args,sam_args,aot_args
 from PIL import Image
-from aot_tracker import _palette
+from inference.aot_tracker import _palette
 import numpy as np
 import torch
 import gc
@@ -11,7 +10,13 @@ import shutil
 from contextlib import nullcontext
 
 _KERNEL = np.ones((3, 3), np.uint8)
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")
+else:
+    DEVICE = torch.device("cpu")
+
 USE_CUDA = DEVICE.type == "cuda"
 
 def save_prediction(pred_mask,output_dir,file_name):
@@ -64,14 +69,6 @@ def draw_mask(img, mask, alpha=0.5, id_countour=False):
         img_mask[binary_mask] = foreground[binary_mask]
         img_mask[contours,:] = 0
     return img_mask.astype(img.dtype)
-
-
-aot_model2ckpt = {
-    "deaotb": "./ckpt/DeAOTB_PRE_YTB_DAV.pth",
-    "deaotl": "./ckpt/DeAOTL_PRE_YTB_DAV",
-    "r50_deaotl": "./ckpt/R50_DeAOTL_PRE_YTB_DAV.pth",
-}
-
 
 def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0):
 

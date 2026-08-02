@@ -13,9 +13,8 @@ import math
 
 from model_args import segtracker_args,sam_args,aot_args
 from SegTracker import SegTracker
-from tool.transfer_tools import draw_outline, draw_points
-from seg_track_anything import aot_model2ckpt, tracking_objects_in_video, draw_mask
-from tool.transfer_tools import mask2bbox
+from mask_utils import draw_outline, draw_points, mask2bbox
+from seg_track_anything import tracking_objects_in_video, draw_mask
 
 def clean():
     return None, None, None, None, None, None, [[], []]
@@ -143,14 +142,13 @@ def SegTracker_add_first_frame(Seg_Tracker, origin_frame, predicted_mask):
 
     return Seg_Tracker
 
-def init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame):
+def init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame):
 
     if origin_frame is None:
         return None, origin_frame, [[], []], ""
 
     # reset aot args
-    aot_args["model"] = aot_model
-    aot_args["model_path"] = aot_model2ckpt[aot_model]
+    aot_args["model_path"] = aot_args["model_path"]
     aot_args["long_term_mem_gap"] = long_term_mem
     aot_args["max_len_long_term"] = max_len_long_term
     # reset sam args
@@ -163,14 +161,13 @@ def init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_ob
 
     return Seg_Tracker, origin_frame, [[], []], ""
 
-def init_SegTracker_Stroke(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame):
+def init_SegTracker_Stroke( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame):
 
     if origin_frame is None:
         return None, origin_frame, [[], []], origin_frame
 
     # reset aot args
-    aot_args["model"] = aot_model
-    aot_args["model_path"] = aot_model2ckpt[aot_model]
+    aot_args["model_path"] = aot_args["model_path"]
     aot_args["long_term_mem_gap"] = long_term_mem
     aot_args["max_len_long_term"] = max_len_long_term
 
@@ -183,7 +180,7 @@ def init_SegTracker_Stroke(aot_model, long_term_mem, max_len_long_term, sam_gap,
     Seg_Tracker.restart_tracker()
     return Seg_Tracker, origin_frame, [[], []], origin_frame
 
-def undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
+def undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack,  long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
 
     if Seg_Tracker is None:
         return Seg_Tracker, origin_frame, [[], []]
@@ -205,7 +202,7 @@ def undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_
     else:
         return Seg_Tracker, origin_frame, [[], []]
 
-def roll_back_undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side,input_video, input_img_seq, frame_num, refine_idx):
+def roll_back_undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack,  long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side,input_video, input_img_seq, frame_num, refine_idx):
 
     if Seg_Tracker is None:
         return Seg_Tracker, origin_frame, [[], []]
@@ -253,7 +250,7 @@ def seg_acc_click(Seg_Tracker, prompt, origin_frame):
     return masked_frame
 
 
-def sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, evt:gr.SelectData):
+def sam_click(Seg_Tracker, origin_frame, point_mode, click_stack,  long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, evt:gr.SelectData):
     """
     Args:
         origin_frame: nd.array
@@ -269,7 +266,7 @@ def sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_model, lon
         point = {"coord": [evt.index[0], evt.index[1]], "mode": 0}
 
     if Seg_Tracker is None:
-        Seg_Tracker, _, _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
+        Seg_Tracker, _, _, _ = init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
 
     # get click prompts for sam to predict mask
     click_prompt = get_click_prompt(click_stack, point)
@@ -280,7 +277,7 @@ def sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_model, lon
     return Seg_Tracker, masked_frame, click_stack
 
 
-def roll_back_sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, input_video, input_img_seq, frame_num, refine_idx, evt:gr.SelectData):
+def roll_back_sam_click(Seg_Tracker, origin_frame, point_mode, click_stack,  long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, input_video, input_img_seq, frame_num, refine_idx, evt:gr.SelectData):
     """
     Args:
         origin_frame: nd.array
@@ -296,7 +293,7 @@ def roll_back_sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_
         point = {"coord": [evt.index[0], evt.index[1]], "mode": 0}
 
     if Seg_Tracker is None:
-        Seg_Tracker, _, _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
+        Seg_Tracker, _, _, _ = init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
 
     # get click prompts for sam to predict mask
     prompt = get_click_prompt(click_stack, point)
@@ -320,10 +317,10 @@ def roll_back_sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_
 
     return Seg_Tracker, masked_frame, click_stack
 
-def sam_stroke(Seg_Tracker, origin_frame, drawing_board, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
+def sam_stroke(Seg_Tracker, origin_frame, drawing_board,  long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
 
     if Seg_Tracker is None:
-        Seg_Tracker, _ , _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
+        Seg_Tracker, _ , _, _ = init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
 
     print("Stroke")
     mask = drawing_board["mask"]
@@ -334,9 +331,9 @@ def sam_stroke(Seg_Tracker, origin_frame, drawing_board, aot_model, long_term_me
 
     return Seg_Tracker, masked_frame, origin_frame
 
-def gd_detect(Seg_Tracker, origin_frame, grounding_caption, box_threshold, text_threshold, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
+def gd_detect(Seg_Tracker, origin_frame, grounding_caption, box_threshold, text_threshold,  long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
     if Seg_Tracker is None:
-        Seg_Tracker, _ , _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
+        Seg_Tracker, _ , _, _ = init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
 
     print("Detect")
     predicted_mask, annotated_frame= Seg_Tracker.detect_and_seg(origin_frame, grounding_caption, box_threshold, text_threshold)
@@ -348,15 +345,15 @@ def gd_detect(Seg_Tracker, origin_frame, grounding_caption, box_threshold, text_
 
     return Seg_Tracker, masked_frame, origin_frame
 
-def segment_everything(Seg_Tracker, aot_model, long_term_mem, max_len_long_term, origin_frame, sam_gap, max_obj_num, points_per_side):
+def segment_everything(Seg_Tracker,  long_term_mem, max_len_long_term, origin_frame, sam_gap, max_obj_num, points_per_side):
 
     if Seg_Tracker is None:
-        Seg_Tracker, _ , _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
+        Seg_Tracker, _ , _, _ = init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
 
     print("Everything")
 
     frame_idx = 0
-    print("starting the process!")
+    print("In progress")
     with autocast_context:
         pred_mask = Seg_Tracker.seg(origin_frame)
         if torch.cuda.is_available(): torch.cuda.empty_cache()
@@ -474,14 +471,12 @@ def choose_obj_to_refine(input_video, input_img_seq, Seg_Tracker, frame_num, evt
 
     return chosen_frame_show, idx
 
-def show_chosen_idx_to_refine(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, input_video, input_img_seq, Seg_Tracker, frame_num, idx):
+def show_chosen_idx_to_refine( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, input_video, input_img_seq, Seg_Tracker, frame_num, idx):
     chosen_frame_show, curr_mask, ori_frame = res_by_num(input_video, input_img_seq, frame_num)
     if Seg_Tracker is None:
         print("reset aot args, new SegTracker")
-        Seg_Tracker, _ , _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, ori_frame)
+        Seg_Tracker, _ , _, _ = init_SegTracker( long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, ori_frame)
     # # reset aot args
-    # aot_args["model"] = aot_model
-    # aot_args["model_path"] = aot_model2ckpt[aot_model]
     # aot_args["long_term_mem_gap"] = long_term_mem
     # aot_args["max_len_long_term"] = max_len_long_term
     # # reset sam args
@@ -501,8 +496,6 @@ def show_chosen_idx_to_refine(aot_model, long_term_mem, max_len_long_term, sam_g
     Seg_Tracker.sam.have_embedded = False
     Seg_Tracker.sam.interactive_predictor.features = None
     return ori_frame, Seg_Tracker, ori_frame, [[], []], ""
-
-
 
 
 def seg_track_app():
@@ -529,7 +522,6 @@ def seg_track_app():
         refine_idx = gr.State(None)
         frame_num = gr.State(None)
 
-        aot_model = gr.State(None)
         sam_gap = gr.State(None)
         points_per_side = gr.State(None)
         max_obj_num = gr.State(None)
@@ -656,20 +648,8 @@ def seg_track_app():
                                 interactive=True
                             )
                             with gr.Accordion("aot advanced options", open=False):
-                                aot_model = gr.Dropdown(
-                                    label="aot_model",
-                                    choices = [
-                                        "deaotb",
-                                        "deaotl",
-                                        "r50_deaotl"
-                                    ],
-                                    value = "r50_deaotl",
-                                    interactive=True,
-                                )
                                 long_term_mem = gr.Slider(label="long term memory gap", minimum=1, maximum=9999, value=9999, step=1)
                                 max_len_long_term = gr.Slider(label="max len of long term memory", minimum=1, maximum=9999, value=9999, step=1)
-
-
 
                     with gr.Column():
                         new_object_button = gr.Button(
@@ -798,7 +778,7 @@ def seg_track_app():
         tab_everything.select(
             fn=init_SegTracker,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -816,7 +796,7 @@ def seg_track_app():
         tab_click.select(
             fn=init_SegTracker,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -833,7 +813,7 @@ def seg_track_app():
         tab_stroke.select(
             fn=init_SegTracker_Stroke,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -850,7 +830,7 @@ def seg_track_app():
         tab_text.select(
             fn=init_SegTracker,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -867,7 +847,7 @@ def seg_track_app():
         tab_audio_grounding.select(
             fn=init_SegTracker,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -895,7 +875,7 @@ def seg_track_app():
             fn=gd_detect,
             inputs=[
                 Seg_Tracker, origin_frame, predicted_texts, box_threshold, text_threshold,
-                aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side
+                 long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side
             ],
             outputs=[
                 Seg_Tracker, input_first_frame
@@ -909,7 +889,7 @@ def seg_track_app():
             fn=segment_everything,
             inputs=[
                 Seg_Tracker,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 origin_frame,
@@ -929,7 +909,7 @@ def seg_track_app():
             fn=sam_click,
             inputs=[
                 Seg_Tracker, origin_frame, point_mode, click_stack,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -946,7 +926,7 @@ def seg_track_app():
             fn=sam_stroke,
             inputs=[
                 Seg_Tracker, origin_frame, drawing_board,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -963,7 +943,7 @@ def seg_track_app():
             fn=gd_detect,
             inputs=[
                 Seg_Tracker, origin_frame, grounding_caption, box_threshold, text_threshold,
-                aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side
+                 long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side
                 ],
             outputs=[
                 Seg_Tracker, input_first_frame
@@ -1012,7 +992,7 @@ def seg_track_app():
         roll_back_button.click(
             fn=show_chosen_idx_to_refine,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -1033,7 +1013,7 @@ def seg_track_app():
             fn = roll_back_undo_click_stack_and_refine_seg,
             inputs=[
                 Seg_Tracker, origin_frame, click_stack,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -1050,7 +1030,7 @@ def seg_track_app():
             fn=roll_back_sam_click,
             inputs=[
                 Seg_Tracker, origin_frame, roll_back_point_mode, click_stack,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -1085,7 +1065,7 @@ def seg_track_app():
         reset_button.click(
             fn=init_SegTracker,
             inputs=[
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -1105,7 +1085,7 @@ def seg_track_app():
         # every_reset_but.click(
         #     fn=init_SegTracker,
         #     inputs=[
-        #         aot_model,
+        #
         #         sam_gap,
         #         max_obj_num,
         #         points_per_side,
@@ -1121,7 +1101,7 @@ def seg_track_app():
         # click_reset_but.click(
         #     fn=init_SegTracker,
         #     inputs=[
-        #         aot_model,
+        #
         #         sam_gap,
         #         max_obj_num,
         #         points_per_side,
@@ -1137,7 +1117,7 @@ def seg_track_app():
         # stroke_reset_but.click(
         #     fn=init_SegTracker_Stroke,
         #     inputs=[
-        #         aot_model,
+        #
         #         sam_gap,
         #         max_obj_num,
         #         points_per_side,
@@ -1155,7 +1135,7 @@ def seg_track_app():
             fn = undo_click_stack_and_refine_seg,
             inputs=[
                 Seg_Tracker, origin_frame, click_stack,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
@@ -1171,7 +1151,7 @@ def seg_track_app():
             fn = undo_click_stack_and_refine_seg,
             inputs=[
                 Seg_Tracker, origin_frame, click_stack,
-                aot_model,
+
                 long_term_mem,
                 max_len_long_term,
                 sam_gap,
