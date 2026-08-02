@@ -1,11 +1,8 @@
-from statistics import mode
 import torch
 import torch.nn.functional as F
-import os
-import sys
-sys.path.append("./aot")
 from aot.networks.engines.aot_engine import AOTEngine,AOTInferEngine
 from aot.networks.engines.deaot_engine import DeAOTEngine,DeAOTInferEngine
+from aot.configs.default import DefaultEngineConfig
 import importlib
 import numpy as np
 
@@ -216,8 +213,7 @@ class DeAOTTrackerInferEngine(DeAOTInferEngine):
 
 def get_aot(args):
     # build vos engine
-    engine_config = importlib.import_module('configs.' + 'pre_ytb_dav')
-    cfg = engine_config.EngineConfig(args['phase'], args['model'])
+    cfg = DefaultEngineConfig(args['phase'], args['model'])
     cfg.TEST_CKPT_PATH = args['model_path']
     cfg.TEST_LONG_TERM_MEM_GAP = args['long_term_mem_gap']
     cfg.MAX_LEN_LONG_TERM = args['max_len_long_term']
