@@ -2,8 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from networks.layers.basic import DropPath, GroupNorm1D, GNActDWConv2d, seq_to_2d, ScaleOffset, mask_out
-from networks.layers.attention import silu, MultiheadAttention, MultiheadLocalAttentionV2, MultiheadLocalAttentionV3, GatedPropagation, LocalGatedPropagation
+from aot.networks.layers.basic import DropPath, GroupNorm1D, GNActDWConv2d, seq_to_2d, ScaleOffset, mask_out
+from aot.networks.layers.attention import silu, MultiheadAttention, MultiheadLocalAttentionV2, MultiheadLocalAttentionV3, GatedPropagation, LocalGatedPropagation
 
 
 def _get_norm(indim, type='ln', groups=8):
@@ -280,9 +280,8 @@ class LongShortTermTransformerBlock(nn.Module):
             try:
                 import spatial_correlation_sampler
                 MultiheadLocalAttention = MultiheadLocalAttentionV2
-            except Exception as inst:
-                print(inst)
-                print("Failed to import PyTorch Correlation, For better efficiency, please install it.")
+            except Exception:
+                pass
                 MultiheadLocalAttention = MultiheadLocalAttentionV3
         else:
             MultiheadLocalAttention = MultiheadLocalAttentionV3
@@ -413,9 +412,8 @@ class LongShortTermTransformerBlockV2(nn.Module):
             try:
                 import spatial_correlation_sampler
                 MultiheadLocalAttention = MultiheadLocalAttentionV2
-            except Exception as inst:
-                print(inst)
-                print("Failed to import PyTorch Correlation, For better efficiency, please install it.")
+            except Exception:
+                pass
                 MultiheadLocalAttention = MultiheadLocalAttentionV3
         else:
             MultiheadLocalAttention = MultiheadLocalAttentionV3
@@ -563,9 +561,8 @@ class GatedPropagationModule(nn.Module):
         if enable_corr:
             try:
                 import spatial_correlation_sampler
-            except Exception as inst:
-                print(inst)
-                print("Failed to import PyTorch Correlation, For better efficiency, please install it.")
+            except Exception:
+                pass
                 enable_corr = False
         self.short_term_attn = LocalGatedPropagation(d_qk=self.d_model,
                                           d_vu=self.d_model * 2,

@@ -1,1 +1,1 @@
-from .resnest import *
+from aot.networks.encoders.resnest import *

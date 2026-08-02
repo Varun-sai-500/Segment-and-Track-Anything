@@ -1,10 +1,9 @@
 import os
 import importlib
 
-
 class DefaultEngineConfig():
     def __init__(self, exp_name='default', model='aott'):
-        model_cfg = importlib.import_module('configs.models.' +
+        model_cfg = importlib.import_module('aot.configs.models.' +
                                             model).ModelConfig()
         self.__dict__.update(model_cfg.__dict__)  # add model config
 
@@ -107,32 +106,8 @@ class DefaultEngineConfig():
         self.DIST_START_GPU = 0
 
     def init_dir(self):
-        self.DIR_DATA = '../VOS02/datasets'#'./datasets'
+        self.DIR_DATA = 'datasets'
         self.DIR_DAVIS = os.path.join(self.DIR_DATA, 'DAVIS')
         self.DIR_YTB = os.path.join(self.DIR_DATA, 'YTB')
         self.DIR_STATIC = os.path.join(self.DIR_DATA, 'Static')
-
-        self.DIR_ROOT = './'#'./data_wd/youtube_vos_jobs'
-
-        self.DIR_RESULT = os.path.join(self.DIR_ROOT, 'result', self.EXP_NAME,
-                                       self.STAGE_NAME)
-        self.DIR_CKPT = os.path.join(self.DIR_RESULT, 'ckpt')
-        self.DIR_EMA_CKPT = os.path.join(self.DIR_RESULT, 'ema_ckpt')
-        self.DIR_LOG = os.path.join(self.DIR_RESULT, 'log')
-        self.DIR_TB_LOG = os.path.join(self.DIR_RESULT, 'log', 'tensorboard')
-        # self.DIR_IMG_LOG = os.path.join(self.DIR_RESULT, 'log', 'img')
-        # self.DIR_EVALUATION = os.path.join(self.DIR_RESULT, 'eval')
-        self.DIR_IMG_LOG = './img_logs'
-        self.DIR_EVALUATION = './results'
-
-        for path in [
-                self.DIR_RESULT, self.DIR_CKPT, self.DIR_EMA_CKPT,
-                self.DIR_LOG, self.DIR_EVALUATION, self.DIR_IMG_LOG,
-                self.DIR_TB_LOG
-        ]:
-            if not os.path.isdir(path):
-                try:
-                    os.makedirs(path)
-                except Exception as inst:
-                    print(inst)
-                    print('Failed to make dir: {}.'.format(path))
+        self.DIR_ROOT = './'
