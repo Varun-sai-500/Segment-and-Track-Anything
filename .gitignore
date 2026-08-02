@@ -12,7 +12,5 @@ cym_utils
 /aot/results
 /aot/pretrain_models
 /aot/datasets
-/ast_master
-/myvenv
-/sam
+/venv
 /.gradio

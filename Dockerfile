@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.12.1-cuda13.0-cudnn9-devel
+FROM pytorch/pytorch:2.13.0-cuda13.0-cudnn9-devel
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_HOME=/usr/local/cuda
@@ -18,14 +18,14 @@ WORKDIR /workspace
 
 COPY . .
 
-RUN pip install --upgrade pip
+RUN python -m pip install --upgrade pip
 
 RUN pip install \
-transformers==5.13.0 \
-timm==1.0.27 \
+transformers==5.14.1 \
+timm==1.0.28 \
 opencv-python-headless==5.0.0.93 \
 Pillow==12.3.0 \
-gradio==6.20.0 \
+gradio==6.22.0 \
 gdown==6.1.0
 
 RUN pip install git+https://github.com/facebookresearch/segment-anything.git

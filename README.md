@@ -1,5 +1,4 @@
 # Segment and Track Anything (SAM-Track)
-**Online Demo:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R10N70AJaslzADFqb-a5OihYkllWEVxB?usp=sharing)
 **Technical Report**: [![](https://img.shields.io/badge/Report-arXiv:2305.06558-green)](https://arxiv.org/abs/2305.06558)
 
 **Tutorial:** [tutorial-v1.6(audio)](./tutorial/tutorial%20for%20WebUI-1.6-Version.md),[tutorial-v1.5 (Text)](./tutorial/tutorial%20for%20WebUI-1.5-Version.md), [tutorial-v1.0 (Click & Brush)](./tutorial/tutorial%20for%20WebUI-1.0-Version.md)
@@ -52,7 +51,6 @@ Segment and Track anything has been adopted as core infrastructure in published 
 This video showcases the segmentation and tracking capabilities of SAM-Track in various scenarios, such as street views, AR, cells, animations, aerial shots, and more.
 
 ## :calendar:TODO
- - [x] Colab notebook: Completed on April 25th, 2023.
  - [x] 1.0-Version Interactive WebUI: Completed on April 23rd, 2023.
     - We will create a feature that enables users to interactively modify the mask for the initial video frame according to their needs. The interactive segmentation capabilities of Segment-and-Track-Anything is demonstrated in [Demo8](https://www.youtube.com/watch?v=Xyd54AngvV8&feature=youtu.be) and [Demo9](https://www.youtube.com/watch?v=eZrdna8JkoQ).
     - Bilibili Video Link: [Demo8](https://www.bilibili.com/video/BV1JL411v7uE/), [Demo9](https://www.bilibili.com/video/BV1Qs4y1w763/).
@@ -139,24 +137,39 @@ bash script/install.sh
 
 This project requires FFmpeg (used by MoviePy).
 
-Setup (for Windows)
-Download:
-https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
-Extract to:
-C:\ffmpeg
-Add to PATH:
-C:\ffmpeg\bin
-Restart terminal and verify:
-ffmpeg -version
+Windows
 
-Setup (for linux):
+Download a **shared** FFmpeg build from:
+https://github.com/GyanD/codexffmpeg/releases
+
+Extract it, for example, to:
+```text
+C:\ffmpeg
+```
+Add the following directory to your `PATH`:
+```text
+C:\ffmpeg\bin
+```
+Open a new terminal and verify the installation:
+
+```bash
+ffmpeg -version
+```
+
+#### Linux
+
+```bash
 sudo apt update
 sudo apt install ffmpeg
-ffmpeg -version
 
-Setup (for macOS):
+ffmpeg -version
+```
+#### macOS
+
+```bash
 brew install ffmpeg
 ffmpeg -version
+```
 
 
 
@@ -180,13 +193,6 @@ ffmpeg -version
 | DeAOTL       |    13.2   | [gdrive](https://drive.google.com/file/d/18elNz_wi9JyVBcIUYKhRdL08MA-FqHD5/view?usp=sharing) |
 | R50-DeAOTL   |    19.8   | [gdrive](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view?usp=sharing) |
 | SwinB-DeAOTL |    70.3   | [gdrive](https://drive.google.com/file/d/1g4E-F0RPOx9Nd6J7tU9AE1TjsouL4oZq/view?usp=sharing) |
-
-**Download Grounding-DINO model to ckpt folder**
-
-| Name | Backbone | Training Data | Box AP (COCO) | Checkpoint |
-|------|----------|---------------|---------------|------------|
-| GroundingDINO-T | Swin-T | O365, GoldG, Cap4M | 48.4 (zero-shot) / 57.2 (fine-tuned) | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth) |
-| GroundingDINO-B | Swin-B | COCO, O365, GoldG, Cap4M, OpenImages, ODinW-35, RefCOCO | 56.7 | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha2/groundingdino_swinb_cogcoor.pth) |
 
 
 **Download AST model to ast_master/pretrained_models, after cloning the AST repository**
