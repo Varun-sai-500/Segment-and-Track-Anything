@@ -1,6 +1,6 @@
 # Tutorial for WebUI 1.0 Version
 
-## Note: 
+## Note:
 - We recommend reinitializing SegTracker by clicking the `Reset button` after processing each video to avoid encountering bugs.
 - If the `SegTracker-Args` are changed, the SegTracker needs to be reinitialized by clicking the Reset button.
 - If the `Drawing board` does not display the image properly, you can refresh the Drawing board by clicking on the `refresh icon` located in the upper right corner of the Drawing board.
@@ -17,7 +17,7 @@
 - `Predicted masks`: show the predicted masks for each frame of the video.
 
 ## 2. Upload your video
-- To upload a video, click on the `input video` component. Once uploaded, the `segment result of first frame` component will display the first frame of the video automatically. 
+- To upload a video, click on the `input video` component. Once uploaded, the `segment result of first frame` component will display the first frame of the video automatically.
 - The examples for uploading a video are shown below.
 
  <p align="center"><img src="./img/click_input_video.jpg" width = "600" height = "400" alt="click_input_video"/> <img src="./img/input_video.jpg" width = "300" height = "400" alt="input_video" /></p>
@@ -30,12 +30,12 @@
 
 ## 4. Interactively modify single-object mask for first frame of video
 ### 4.1 Interactively add single-object based on segment-everything(`Everything-Tab`)
-- `Segment everything for first frame`: By clicking the button, SegTracker will be initialized based on the `SegTracker-Args`, and `Segment-everything` will be performed on the first frame of the video. 
+- `Segment everything for first frame`: By clicking the button, SegTracker will be initialized based on the `SegTracker-Args`, and `Segment-everything` will be performed on the first frame of the video.
 - The example of the `segment-everything` approach are shown below.
 
   <p align="center"><img src="./img/click_segment_everything.jpg" width = "300" height = "300" alt="click_segment_everything"/> <img src="./img/segment_everything_blackswan.jpg" width = "300" height = "300" alt="segment_everything_blackswan"/></p>
 
-- `Point Prompt`: After applying the Segment-everything function, you can click on the image to add objects that were ignored by segment-everything or assign a separate ID to an object by doing this. 
+- `Point Prompt`: After applying the Segment-everything function, you can click on the image to add objects that were ignored by segment-everything or assign a separate ID to an object by doing this.
 - Two examples are provided below: one involves adding water which was previously ignored by the `segment-everything` approach, and the other involves assigning a separate ID to the face of a man.
 
  <p align="center"><img src="./img/add_positive_base_on_everything.jpg" width = "300" height = "300" alt="add_positive_base_on_everything"/>
@@ -57,12 +57,12 @@
 - Below is an example demonstrating how to circle and segment an object using strokes.
  <p align="center"><img src="./img/click_segment.jpg" width = "300" height = "400" alt="Drawing_board"> <img src="./img/Drawing_board.jpg" width = "300" height = "400" alt="Drawing_board"></p>
 
-- `Note`: 
+- `Note`:
     - The current version only supports adding a mask for a single-object(The added objects are assigned the same ID).
     - We do not recommend adding a mask by clicking on `Segment result of first frame` under the `Stroke-Tab`, as this may result in bugs.
-    
-## 5. Segment and Track in Video
-- Once the object to be tracked in the video is identified, you can begin tracking by clicking on the `Start Tracking` button. 
+
+## 4.4. Segment and Track in Video
+- Once the object to be tracked in the video is identified, you can begin tracking by clicking on the `Start Tracking` button.
 - The results are displayed on the `output video` and `predicted masks`.You can download them.
 
  <p align="center"><img src="./img/start_tracking.jpg" width = "600" height = "550" alt="Drawing_board"></p>
