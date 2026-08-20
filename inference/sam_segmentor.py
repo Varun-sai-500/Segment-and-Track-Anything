@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 from sam import sam_model_registry, SamPredictor, SamAutomaticMaskGenerator
 
-
 class Segmentor:
     def __init__(self, sam_args):
         """

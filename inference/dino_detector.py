@@ -1,4 +1,3 @@
-import os
 import cv2
 import numpy as np
 import PIL
@@ -21,30 +20,26 @@ class Detector:
                 device = "cpu"
 
         self.device = device
-        print(f"Loading GroundingDINO model: {self.MODEL_ID}")
+        self.processor = None
+        self.model = None
 
-        self.processor = AutoProcessor.from_pretrained(self.MODEL_ID)
-
-        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
-            self.MODEL_ID
-        ).to(self.device)
-
-        self.model.eval()
+    def _load_model(self):
+        """Lazy-loads the model and processor on first inference call."""
+        if self.model is None:
+            print(f"Loading GroundingDINO model: {self.MODEL_ID}")
+            self.processor = AutoProcessor.from_pretrained(self.MODEL_ID)
+            self.model = AutoModelForZeroShotObjectDetection.from_pretrained(
+                self.MODEL_ID
+            ).to(self.device)
+            self.model.eval()
 
     @staticmethod
     def normalize_caption(text: str):
-        """
-        HuggingFace GroundingDINO expects:
-            - lowercase
-            - each phrase separated by '.'
-            - final '.'
-        """
         parts = [
             part.strip().lower()
             for part in text.split(".")
             if part.strip()
         ]
-
         return ". ".join(parts) + "."
 
     @torch.no_grad()
@@ -55,17 +50,8 @@ class Detector:
         box_threshold,
         text_threshold,
     ):
-        """
-        Returns:
-            annotated_frame : np.ndarray
-            transfered_boxes : np.ndarray
-
-            Shape:
-            [
-                [[x0, y0], [x1, y1]],
-                ...
-            ]
-        """
+        # Trigger model loading only when inference is actually requested
+        self._load_model()
 
         if isinstance(origin_frame, PIL.Image.Image):
             img_pil = origin_frame.convert("RGB")
@@ -91,7 +77,6 @@ class Detector:
         )[0]
 
         annotated_frame = origin_frame.copy()
-
         transfered_boxes = []
 
         for box, score, label in zip(
@@ -132,45 +117,3 @@ class Detector:
         )
 
         return annotated_frame, transfered_boxes
-
-
-if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    detector = Detector(device)
-
-    origin_frame = cv2.imread("./tutorial/img/click_segment_everything.jpg")
-    origin_frame = cv2.cvtColor(origin_frame, cv2.COLOR_BGR2RGB)
-
-    grounding_caption = "swan.water"
-
-    box_threshold = 0.25
-    text_threshold = 0.25
-
-    annotated_frame, boxes = detector.run_grounding(
-        origin_frame,
-        grounding_caption,
-        box_threshold,
-        text_threshold,
-    )
-
-    cv2.imwrite(
-        "./debug/x.png",
-        cv2.cvtColor(annotated_frame, cv2.COLOR_RGB2BGR),
-    )
-
-    bbox_frame = origin_frame.copy()
-
-    for bbox in boxes:
-        cv2.rectangle(
-            bbox_frame,
-            tuple(bbox[0]),
-            tuple(bbox[1]),
-            (0, 0, 255),
-            2,
-        )
-
-    cv2.imwrite(
-        "./debug/bbox_frame.png",
-        cv2.cvtColor(bbox_frame, cv2.COLOR_RGB2BGR),
-    )
