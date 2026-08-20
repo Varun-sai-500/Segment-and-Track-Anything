@@ -22,12 +22,8 @@ RUN python -m pip install --upgrade pip
 
 RUN pip install \
 transformers==5.14.1 \
-timm==1.0.28 \
 opencv-python-headless==5.0.0.93 \
 Pillow==12.3.0 \
-gradio==6.22.0 \
-gdown==6.1.0
-
-RUN pip install git+https://github.com/facebookresearch/segment-anything.git
+gradio==6.22.0 
 
 CMD ["python", "app.py"]
