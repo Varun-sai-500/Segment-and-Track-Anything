@@ -43,7 +43,7 @@ https://huggingface.co/MIT/ast-finetuned-audioset-10-10-0.4593
 
 ## AOT / DeAOT
 
-This project incorporates portions of the AOT/DeAOT implementation from:
+This project incorporates portions of the AOT/DeAOT implementation which are modified in this project:
 
 - Repository: https://github.com/yoxu515/aot-benchmark
 - License: BSD 3-Clause License
