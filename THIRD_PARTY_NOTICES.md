@@ -29,18 +29,6 @@ Model repository:
 
 https://huggingface.co/IDEA-Research/grounding-dino-base
 
-## Audio Spectrogram Transformer (AST)
-
-This project uses the following Hugging Face model:
-
-- Model: `MIT/ast-finetuned-audioset-10-10-0.4593`
-- Platform: Hugging Face
-- License: BSD 3-Clause License
-
-Model repository:
-
-https://huggingface.co/MIT/ast-finetuned-audioset-10-10-0.4593
-
 ## AOT / DeAOT
 
 This project incorporates portions of the AOT/DeAOT implementation which are modified in this project:
