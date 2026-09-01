@@ -49,6 +49,7 @@ Thumbs.db
 *.exe
 *.dll
 *.so
+*.mp4
 
 # Editor
 .vscode/
