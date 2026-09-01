@@ -1,0 +1,7 @@
+services:
+  app:
+    image: ghcr.io/Varun-sai-500/Segment-and-Track-Anything:latest
+    ports:
+      - "7860:7860"
+    gpus: all
+    restart: unless-stopped
