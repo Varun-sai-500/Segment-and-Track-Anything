@@ -217,15 +217,14 @@ class Segmentor:
         Segment an object using a bounding-box prompt.
 
         bbox:
-            [[x0, y0], [x1, y1]]
+            [x0, y0, x1, y1]
 
         Returns:
             mask: (H, W) uint8
         """
         self._load_model()
 
-        x0, y0 = bbox[0]
-        x1, y1 = bbox[1]
+        x0, y0, x1, y1 = bbox
 
         inputs = self.processor(
             images=origin_frame,
