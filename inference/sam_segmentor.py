@@ -87,64 +87,6 @@ class Segmentor:
         return masks, iou_scores
 
     @torch.inference_mode()
-    def segment_points(
-        self,
-        origin_frame,
-        coords,
-        modes,
-        multimask=False,
-    ):
-        """
-        Segment an object using point prompts.
-
-        coords:
-            [[x, y], [x, y], ...]
-
-        modes:
-            [1, 1, 0, ...]
-            1 = foreground
-            0 = background
-
-        Returns:
-            mask: (H, W) uint8
-        """
-        self._load_model()
-
-        coords = np.asarray(coords)
-        modes = np.asarray(modes)
-
-        inputs = self.processor(
-            images=origin_frame,
-            input_points=[[coords.tolist()]],
-            input_labels=[[modes.tolist()]],
-            return_tensors="pt",
-        )
-
-        inputs = self._move_inputs(inputs)
-
-        with _autocast_context(self.device):
-            outputs = self.model(
-                **inputs,
-                multimask_output=multimask,
-            )
-
-        masks, scores = self._post_process(
-            outputs,
-            inputs,
-        )
-
-        masks = masks[0][0]
-        scores = scores[0, 0]
-
-        best_idx = torch.argmax(scores).item()
-
-        return (
-            masks[best_idx]
-            .numpy()
-            .astype(np.uint8)
-        )
-
-    @torch.inference_mode()
     def segment_points_multi(
         self,
         origin_frame,
