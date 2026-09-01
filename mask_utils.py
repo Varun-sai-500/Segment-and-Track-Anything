@@ -46,7 +46,7 @@ def draw_outline(mask, frame):
         frame,
         contours,
         -1,
-        (0, 0, 255),
+        (255, 0, 0),
         2,
     )
 
