@@ -136,29 +136,41 @@ bash script/install.sh
 ```
 
 ### FFmpeg Requirement
-
 This project requires FFmpeg (used by MoviePy).
 
-Setup (for Windows)
-Download:
-https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
-Extract to:
-C:\ffmpeg
-Add to PATH:
-C:\ffmpeg\bin
-Restart terminal and verify:
-ffmpeg -version
+Windows
 
-Setup (for linux):
+Download a **shared** FFmpeg build from:
+https://github.com/GyanD/codexffmpeg/releases
+
+Extract it, for example, to:
+```text
+C:\ffmpeg
+```
+Add the following directory to your `PATH`:
+```text
+C:\ffmpeg\bin
+```
+Open a new terminal and verify the installation:
+
+```bash
+ffmpeg -version
+```
+
+#### Linux
+
+```bash
 sudo apt update
 sudo apt install ffmpeg
-ffmpeg -version
 
-Setup (for macOS):
+ffmpeg -version
+```
+#### macOS
+
+```bash
 brew install ffmpeg
 ffmpeg -version
-
-
+```
 
 ### :star:Model Preparation
 
@@ -189,7 +201,7 @@ ffmpeg -version
 | GroundingDINO-B | Swin-B | COCO, O365, GoldG, Cap4M, OpenImages, ODinW-35, RefCOCO | 56.7 | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha2/groundingdino_swinb_cogcoor.pth) |
 
 
-**Download AST model to ast_master/pretrained_models, after cloning the AST repository**
+**Download AST model to /ckpt folder**
 
 1. [Full AudioSet, 10 tstride, 10 fstride, with Weight Averaging (0.459 mAP)](https://www.dropbox.com/s/ca0b1v2nlxzyeb4/audioset_10_10_0.4593.pth?dl=1)
 2. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 1 (0.450 mAP)](https://www.dropbox.com/s/1tv0hovue1bxupk/audioset_10_10_0.4495.pth?dl=1)
