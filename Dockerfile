@@ -8,8 +8,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-RUN python -m pip install --upgrade pip && \
-    python -m pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --break-system-packages --upgrade pip && \
+    python -m pip install --break-system-packages --no-cache-dir -r requirements.txt
 
 COPY . .
 
