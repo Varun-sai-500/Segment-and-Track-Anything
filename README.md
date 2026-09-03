@@ -1,4 +1,5 @@
 # Segment and Track Anything (SAM-Track)
+**Online Demo:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R10N70AJaslzADFqb-a5OihYkllWEVxB?usp=sharing)
 **Technical Report**: [![](https://img.shields.io/badge/Report-arXiv:2305.06558-green)](https://arxiv.org/abs/2305.06558)
 
 **Tutorial:** [tutorial-v1.6(audio)](./tutorial/tutorial%20for%20WebUI-1.6-Version.md),[tutorial-v1.5 (Text)](./tutorial/tutorial%20for%20WebUI-1.5-Version.md), [tutorial-v1.0 (Click & Brush)](./tutorial/tutorial%20for%20WebUI-1.0-Version.md)
@@ -9,29 +10,19 @@
 
 **Segment and Track Anything** is an open-source project that focuses on the segmentation and tracking of any objects in videos, utilizing both automatic and interactive methods. The primary algorithms utilized include the [**SAM** (Segment Anything Models)](https://github.com/facebookresearch/segment-anything) for automatic/interactive key-frame segmentation and the [**DeAOT** (Decoupling features in Associating Objects with Transformers)](https://github.com/yoxu515/aot-benchmark) (NeurIPS2022) for efficient multi-object tracking and propagation. The SAM-Track pipeline enables dynamic and automatic detection and segmentation of new objects by SAM, while DeAOT is responsible for tracking all identified objects.
 
-## Impact
-
-Segment and Track anything has been adopted as core infrastructure in published robotics research from **MIT CSAIL** and **Harvard SEAS**:
-
-| Project | Institutions | Venue | Details |
-|---------|-------------|-------|---------|
-| [Follow Anything (FAn)](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=10436161) | MIT CSAIL · Harvard SEAS · Project CETI | IEEE RA-L | Open-vocabulary real-time drone tracking system. |
-
----
-
 ## :loudspeaker:New Features
 - [2024/4/23] We have added an audio-grounding feature that tracks the sound-making object within the video's soundtrack.
 - [2023/5/12] We have authored a technical report for SAM-Track.
 - [2023/5/7] We have added `demo_instseg.ipynb`, which uses Grounding-DINO to detect new objects in the key frames of a video. It can be applied in the fields of smart cities and autonomous driving.
 - [2023/4/29] We have added advanced arguments for AOT-L: `long_term_memory_gap` and `max_len_long_term`.
-   - `long_term_memory_gap` controls the frequency at which the AOT model adds new reference frames to its long-term memory. During mask propagation, AOT matches the current frame with the reference frames stored in the long-term memory.
+   - `long_term_memory_gap` controls the frequency at which the AOT model adds new reference frames to its long-term memory. During mask propagation, AOT matches the current frame with the reference frames stored in the long-term memory. 
    - Setting the gap value to a proper value helps to obtain better performance. To avoid memory explosion in long videos, we set a `max_len_long_term` value for the long-term memory storage, i.e. when the number of memory frames reaches the `max_len_long_term value`, the oldest memory frame will be discarded and a new frame will be added.
 
 - [2023/4/26] **Interactive WebUI 1.5-Version**: We have added new features based on Interactive WebUI-1.0 Version.
    - We have added a new form of interactivity—text prompts—to SAMTrack.
    - From now on, multiple objects that need to be tracked can be interactively added.
    - Check out [tutorial](./tutorial/tutorial%20for%20WebUI-1.5-Version.md) for Interactive WebUI 1.5-Version. More demos will be released in the next few days.
-- [2023/4/26] **Image-Sequence input**: The WebUI now has a new feature that allows for input of image sequences, which can be used to test video segmentation datasets. Get started with the [tutorial](./tutorial/tutorial%20for%20Image-Sequence%20input.md) for Image-Sequence input.
+- [2023/4/26] **Image-Sequence input**: The WebUI now has a new feature that allows for input of image sequences, which can be used to test video segmentation datasets. Get started with the [tutorial](./tutorial/tutorial%20for%20Image-Sequence%20input.md) for Image-Sequence input. 
 - [2023/4/25] **Online Demo:** You can easily use SAMTrack in [Colab](https://colab.research.google.com/drive/1R10N70AJaslzADFqb-a5OihYkllWEVxB?usp=sharing) for visual tracking tasks.
 
 - [2023/4/23] **Interactive WebUI:** We have introduced a new WebUI that allows interactive user segmentation through strokes and clicks. Feel free to explore and have fun with the [tutorial](./tutorial/tutorial%20for%20WebUI-1.0-Version.md)!
@@ -51,6 +42,7 @@ Segment and Track anything has been adopted as core infrastructure in published 
 This video showcases the segmentation and tracking capabilities of SAM-Track in various scenarios, such as street views, AR, cells, animations, aerial shots, and more.
 
 ## :calendar:TODO
+ - [x] Colab notebook: Completed on April 25th, 2023.
  - [x] 1.0-Version Interactive WebUI: Completed on April 23rd, 2023.
     - We will create a feature that enables users to interactively modify the mask for the initial video frame according to their needs. The interactive segmentation capabilities of Segment-and-Track-Anything is demonstrated in [Demo8](https://www.youtube.com/watch?v=Xyd54AngvV8&feature=youtu.be) and [Demo9](https://www.youtube.com/watch?v=eZrdna8JkoQ).
     - Bilibili Video Link: [Demo8](https://www.bilibili.com/video/BV1JL411v7uE/), [Demo9](https://www.bilibili.com/video/BV1Qs4y1w763/).
@@ -65,39 +57,39 @@ This video showcases the segmentation and tracking capabilities of SAM-Track in 
 
 **Demo1** showcases SAM-Track's ability to take the class of objects as prompt. The user gives the category text 'panda' to enable instance-level segmentation and tracking of all objects belonging to this category.
 <div align=center>
-
+ 
 [![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683347297/video_to_markdown/images/youtube--5oieHqFIJPc-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=5oieHqFIJPc&feature=youtu.be "demo1")
 </div>
 
 **Demo2** showcases SAM-Track's ability to take the text description as prompt. SAM-Track could segment and track target objects given the input that 'panda on the far left'.
 <div align=center>
-
+ 
 [![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683347643/video_to_markdown/images/youtube--nXfq17X6ohk-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=nXfq17X6ohk "demo1")
 </div>
 
 
 **Demo3** showcases SAM-Track's ability to track numerous objects at the same time. SAM-Track is capable of automatically detecting newly appearing objects.
 <div align=center>
-
+ 
 [![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683347961/video_to_markdown/images/youtube--jMqFMq0tRP0-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=jMqFMq0tRP0 "demo1")
 </div>
 
-**Demo4** showcases SAM-Track's ability to take multiple modes of interactions as prompt. The user specified human and skateboard with click and brushstroke, respectively.
+**Demo4** showcases SAM-Track's ability to take multiple modes of interactions as prompt. The user specified human and skateboard with click and brushstroke, respectively.  
 <div align=center>
-
+ 
 [![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348115/video_to_markdown/images/youtube--UFtwFaOfx2I-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=UFtwFaOfx2I&feature=youtu.be "demo1")
 </div>
 
 
 **Demo5** showcases SAM-Track's ability to refine the results of segment-everything. The user merges the tram as a whole with a single click.
 <div align=center>
-
+ 
 [![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348276/video_to_markdown/images/youtube--cK5MPFdJdSY-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=cK5MPFdJdSY&feature=youtu.be "demo1")
 </div>
 
 **Demo6** showcases SAM-Track's ability to add new objects during tracking. The user annotates another car by rolling back to an intermediate frame.
 <div align=center>
-
+ 
 [![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348411/video_to_markdown/images/youtube--l7hXM1a3nEA-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=l7hXM1a3nEA "demo1")
 </div>
 
@@ -115,7 +107,7 @@ This video showcases the segmentation and tracking capabilities of SAM-Track in 
 
 **Demo9** showcases SAM-Track's ability to interactively add specified objects for tracking.The user customized the addition of objects to be tracked on top of the segmentation of everything in the scene using SAM-Track.
 <div align=center>
-
+ 
 [![Interactive Segment-and-Track-Anything Demo2](https://res.cloudinary.com/marcomontalbano/image/upload/v1681712071/video_to_markdown/images/youtube--eZrdna8JkoQ-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=eZrdna8JkoQ "Interactive Segment-and-Track-Anything Demo2")
 </div>
 
@@ -133,94 +125,23 @@ Use the `install.sh` to install the necessary libs for SAM-Track
 bash script/install.sh
 ```
 
-### FFmpeg Requirement
-
-This project requires FFmpeg (used by MoviePy).
-
-Windows
-
-Download a **shared** FFmpeg build from:
-https://github.com/GyanD/codexffmpeg/releases
-
-Extract it, for example, to:
-```text
-C:\ffmpeg
-```
-Add the following directory to your `PATH`:
-```text
-C:\ffmpeg\bin
-```
-Open a new terminal and verify the installation:
-
-```bash
-ffmpeg -version
-```
-
-#### Linux
-
-```bash
-sudo apt update
-sudo apt install ffmpeg
-
-ffmpeg -version
-```
-#### macOS
-
-```bash
-brew install ffmpeg
-ffmpeg -version
-```
-
-
-
 ### :star:Model Preparation
+Download SAM model to ckpt, the default model is SAM-VIT-B ([sam_vit_b_01ec64.pth](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth)).
 
-**- Download the SAM model to ckpt folder for running the code**
+Download DeAOT/AOT model to ckpt, the default model is R50-DeAOT-L ([R50_DeAOTL_PRE_YTB_DAV.pth](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view)).
 
-1. SAM vit_b (default) : https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+Download Grounding-Dino model to ckpt, the default model is GroundingDINO-T ([groundingdino_swint_ogc](https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth)).
 
-2. SAM vit_l: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth
+Download AST model to ast_master/pretrained_models, the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
 
-3. SAM vit_h: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
-
-**- Download DEAOT model to ckpt folder for running the code**
-
-| Model      | Param (M) |                                             PRE_YTB_DAV                                        |
-|:---------- |:---------:|:--------------------------------------------------------------------------------------------:  |
-| DeAOTT       |    7.2    | [gdrive](https://drive.google.com/file/d/1ThWIZQS03cYWx1EKNN8MIMnJS5eRowzr/view?usp=sharing) |
-| DeAOTS       |    10.2   | [gdrive](https://drive.google.com/file/d/1YwIAV5tBtn5spSFxKLBQBEQGwPHyQlHi/view?usp=sharing) |
-| DeAOTB       |    13.2   | [gdrive](https://drive.google.com/file/d/1BHxsonnvJXylqHlZ1zJHHc-ymKyq-CFf/view?usp=sharing) |
-| DeAOTL       |    13.2   | [gdrive](https://drive.google.com/file/d/18elNz_wi9JyVBcIUYKhRdL08MA-FqHD5/view?usp=sharing) |
-| R50-DeAOTL   |    19.8   | [gdrive](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view?usp=sharing) |
-| SwinB-DeAOTL |    70.3   | [gdrive](https://drive.google.com/file/d/1g4E-F0RPOx9Nd6J7tU9AE1TjsouL4oZq/view?usp=sharing) |
-
-
-**Download AST model to ckpt folder**
-
-1. [Full AudioSet, 10 tstride, 10 fstride, with Weight Averaging (0.459 mAP)](https://www.dropbox.com/s/ca0b1v2nlxzyeb4/audioset_10_10_0.4593.pth?dl=1)
-2. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 1 (0.450 mAP)](https://www.dropbox.com/s/1tv0hovue1bxupk/audioset_10_10_0.4495.pth?dl=1)
-3. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 2  (0.448 mAP)](https://www.dropbox.com/s/6u5sikl4b9wo4u5/audioset_10_10_0.4483.pth?dl=1)
-4. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 3  (0.448 mAP)](https://www.dropbox.com/s/kt6i0v9fvfm1mbq/audioset_10_10_0.4475.pth?dl=1)
-5. [Full AudioSet, 12 tstride, 12 fstride, without Weight Averaging, Model (0.447 mAP)](https://www.dropbox.com/s/snfhx3tizr4nuc8/audioset_12_12_0.4467.pth?dl=1)
-6. [Full AudioSet, 14 tstride, 14 fstride, without Weight Averaging, Model (0.443 mAP)](https://www.dropbox.com/s/z18s6pemtnxm4k7/audioset_14_14_0.4431.pth?dl=1)
-7. [Full AudioSet, 16 tstride, 16 fstride, without Weight Averaging, Model (0.442 mAP)](https://www.dropbox.com/s/mdsa4t1xmcimia6/audioset_16_16_0.4422.pth?dl=1)
-
-8. [Speechcommands V2-35, 10 tstride, 10 fstride, without Weight Averaging, Model (98.12% accuracy on evaluation set)](https://www.dropbox.com/s/q0tbqpwv44pquwy/speechcommands_10_10_0.9812.pth?dl=1)
- the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
-
-You can download the **default weights** using the command line as shown below.
-$$
+You can download the default weights using the command line as shown below.
+```
 bash script/download_ckpt.sh
-$$
-
-### Running docker file
-
-1. docker build -f Dockerfile -t myimage .
-2. docker run myimage
+```
 
 ### :heart:Run Demo
-- The video to be processed can be put in ./assets.
-- Then run **demo.ipynb** step by step to generate results.
+- The video to be processed can be put in ./assets. 
+- Then run **demo.ipynb** step by step to generate results. 
 - The results will be saved as masks for each frame and a gif file for visualization.
 
 The arguments for SAM-Track, DeAOT and SAM can be manually modified in model_args.py for purpose of using other models or controling the behavior of each model.
@@ -238,20 +159,6 @@ Users can upload the video directly on the UI and use SegTracker to automaticall
 SegTracker-Parameters:
  - **aot_model**: used to select which version of DeAOT/AOT to use for tracking and propagation.
  - **sam_gap**: used to control how often SAM is used to add newly appearing objects at specified frame intervals. Increase to decrease the frequency of discovering new targets, but significantly improve speed of inference.
-
- **Common issue:** – Unexpected new object detections after ~100 frames
-
-If you observe that only a subset of objects (e.g., 32 fish) were initially selected, but after around frame 100 the tracker suddenly detects many additional objects (e.g., 96 fish, including false positives in the background), this is expected behavior rather than a bug.
-
-By default, SAM is re-invoked every sam_gap = 100 frames to discover newly appearing objects. During this re-segmentation step, SAM may automatically detect additional objects or background regions, increasing the number of tracked instances.
-
-Solution: Increase the sam_gap value to a number larger than the total number of frames you intend to process (or larger than the frame index where this occurs). This prevents automatic SAM re-segmentation and keeps tracking only the objects that were initially selected.
-
-For example:
-
-Tracking a 150-frame video with fixed objects? Set sam_gap = 1000.
-Want SAM to discover genuinely new objects during tracking? Keep sam_gap at a smaller value.
-
  - **points_per_side**: used to control the number of points per side used for generating masks by sampling a grid over the image. Increasing the size enhances the ability to detect small objects, but larger targets may be segmented into finer granularity.
  - **max_obj_num**: used to limit the maximum number of objects that SAM-Track can detect and track. A larger number of objects necessitates a greater utilization of memory, with approximately 16GB of memory capable of processing a maximum of 255 objects.
 
@@ -261,7 +168,7 @@ Usage: To see the details, please refer to the [tutorial for 1.0-Version WebUI](
 Thank you for your interest in this project. The project is supervised by the ReLER Lab at Zhejiang University’s College of Computer Science and Technology. ReLER was established by Yang Yi, a Qiu Shi Distinguished Professor at Zhejiang University. Our dedicated team of contributors includes [Yangming Cheng](https://github.com/yamy-cheng), Jiyuan Hu, [Yuanyou Xu](https://github.com/yoxu515), [Liulei Li](https://github.com/lingorX), [Xiaodi Li](https://github.com/LiNO3Dy), [Zongxin Yang](https://z-x-yang.github.io/), [Wenguan Wang](https://sites.google.com/view/wenguanwang) and [Yi Yang](https://scholar.google.com/citations?user=RMSuNFwAAAAJ&hl=en).
 
 ### :full_moon_with_face:Credits
-Licenses for borrowed code can be found in [licenses.md](https://github.com/z-x-yang/Segment-and-Track-Anything/blob/main/licenses.md) file.
+Licenses for borrowed code can be found in [licenses.md](https://github.com/z-x-yang/Segment-and-Track-Anything/blob/main/licenses.md) file. 
 
 * DeAOT/AOT - [https://github.com/yoxu515/aot-benchmark](https://github.com/yoxu515/aot-benchmark)
 * SAM - [https://github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything)
@@ -321,6 +228,6 @@ Please consider citing the related paper(s) in your publications if it helps you
   booktitle={Proc. Interspeech 2021},
   pages={571--575},
   doi={10.21437/Interspeech.2021-698}
-  year={2021}
+  year={2021} 
 }
 ```
