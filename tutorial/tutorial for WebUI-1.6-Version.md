@@ -4,10 +4,17 @@
 
 
 ## audio-grounding
-### 1. Clone the audio-spectrum transformer (AST) model to `./ast_master` and download the pretrained model
+### 1. Download the audio-spectrum transformer (AST) pretrained model to `./ckpt`
 ```
-git clone https://github.com/YuanGongND/ast.git ast_master
-wget -O ./ast_master/pretrained_models/audio_mdl.pth https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1
+
+mkdir -p ./ckpt
+
+curl -L "https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1" \
+  -o ./ckpt/audio_mdl.pth
+
+curl -L https://raw.githubusercontent.com/YuanGongND/ast/master/egs/audioset/data/class_labels_indices.csv \
+  -o ./ckpt/class_labels_indices.csv
+
 ```
 
 ### 2. Switch to Audio-Tab by clicking the `audio-grounding` Tab
