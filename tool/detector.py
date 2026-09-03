@@ -53,6 +53,7 @@ class Detector:
         checkpoint = torch.load(grounding_dino_ckpt, map_location='cpu')
         log = self.gd.load_state_dict(clean_state_dict(checkpoint['model']), strict=False)
         print("Model loaded from {} \n => {}".format(grounding_dino_ckpt, log))
+        self.gd.to(device)
         self.gd.eval()
 
     def image_transform_grounding(self, init_image):
@@ -112,13 +113,17 @@ class Detector:
         return annotated_frame, transfered_boxes
 
 if __name__ == "__main__":
-    detector = Detector("cuda")
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
     origin_frame = cv2.imread('./debug/point.png')
     origin_frame = cv2.cvtColor(origin_frame, cv2.COLOR_BGR2RGB)
     grounding_caption = "swan.water"
     box_threshold = 0.25
     text_threshold = 0.25
-
+    detector = Detector(device)
     annotated_frame, boxes = detector.run_grounding(origin_frame, grounding_caption, box_threshold, text_threshold)
     cv2.imwrite('./debug/x.png', annotated_frame)
 

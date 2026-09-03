@@ -4,9 +4,37 @@ import numpy as np
 from pathlib import Path
 
 
-def get_device(gpu=None):
+def get_device(device=None):
+    if device is None:
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
+
+    if isinstance(device, torch.device):
+        return device
+
+    if isinstance(device, str):
+        if device == "cuda" and not torch.cuda.is_available():
+            if torch.backends.mps.is_available():
+                return torch.device("mps")
+            return torch.device("cpu")
+
+        if device == "mps" and not torch.backends.mps.is_available():
+            if torch.cuda.is_available():
+                return torch.device("cuda")
+            return torch.device("cpu")
+
+        return torch.device(device)
+
+    # Integer GPU id
     if torch.cuda.is_available():
-        return torch.device(f"cuda:{gpu}" if gpu is not None else "cuda")
+        return torch.device(f"cuda:{device}")
+
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+
     return torch.device("cpu")
 
 

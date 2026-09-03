@@ -1,7 +1,6 @@
 import gradio as gr
 import os
 import shutil
-import subprocess
 import zipfile
 import gc
 import numpy as np
@@ -59,7 +58,7 @@ def get_click_prompt(click_stack, point):
     click_stack[0].append(point["coord"])
     click_stack[1].append(point["mode"]
     )
-
+    
     prompt = {
         "points_coord":click_stack[0],
         "points_mode":click_stack[1],
@@ -74,7 +73,7 @@ def get_meta_from_video(input_video):
 
     print("get meta information of input video")
     cap = cv2.VideoCapture(input_video)
-
+    
     _, first_frame = cap.read()
     cap.release()
 
@@ -113,7 +112,7 @@ def get_meta_from_img_seq(input_img_seq):
     return first_frame, first_frame, first_frame, ""
 
 def SegTracker_add_first_frame(Seg_Tracker, origin_frame, predicted_mask):
-    with torch.cuda.amp.autocast():
+    with autocast_context:
         # Reset the first frame's mask
         frame_idx = 0
         Seg_Tracker.restart_tracker()
@@ -123,7 +122,7 @@ def SegTracker_add_first_frame(Seg_Tracker, origin_frame, predicted_mask):
     return Seg_Tracker
 
 def init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame):
-
+    
     if origin_frame is None:
         return None, origin_frame, [[], []], ""
 
@@ -136,14 +135,14 @@ def init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_ob
     segtracker_args["sam_gap"] = sam_gap
     segtracker_args["max_obj_num"] = max_obj_num
     sam_args["generator_args"]["points_per_side"] = points_per_side
-
+    
     Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
     Seg_Tracker.restart_tracker()
 
     return Seg_Tracker, origin_frame, [[], []], ""
 
 def init_SegTracker_Stroke(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame):
-
+    
     if origin_frame is None:
         return None, origin_frame, [[], []], origin_frame
 
@@ -157,13 +156,13 @@ def init_SegTracker_Stroke(aot_model, long_term_mem, max_len_long_term, sam_gap,
     segtracker_args["sam_gap"] = sam_gap
     segtracker_args["max_obj_num"] = max_obj_num
     sam_args["generator_args"]["points_per_side"] = points_per_side
-
+    
     Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
     Seg_Tracker.restart_tracker()
     return Seg_Tracker, origin_frame, [[], []], origin_frame
 
 def undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side):
-
+    
     if Seg_Tracker is None:
         return Seg_Tracker, origin_frame, [[], []]
 
@@ -171,7 +170,7 @@ def undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_
     if len(click_stack[0]) > 0:
         click_stack[0] = click_stack[0][: -1]
         click_stack[1] = click_stack[1][: -1]
-
+    
     if len(click_stack[0]) > 0:
         prompt = {
             "points_coord":click_stack[0],
@@ -185,7 +184,7 @@ def undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_
         return Seg_Tracker, origin_frame, [[], []]
 
 def roll_back_undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_stack, aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side,input_video, input_img_seq, frame_num, refine_idx):
-
+    
     if Seg_Tracker is None:
         return Seg_Tracker, origin_frame, [[], []]
 
@@ -193,7 +192,7 @@ def roll_back_undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_s
     if len(click_stack[0]) > 0:
         click_stack[0] = click_stack[0][: -1]
         click_stack[1] = click_stack[1][: -1]
-
+    
     if len(click_stack[0]) > 0:
         prompt = {
             "points_coord":click_stack[0],
@@ -203,8 +202,8 @@ def roll_back_undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_s
 
         chosen_frame_show, curr_mask, ori_frame = res_by_num(input_video, input_img_seq, frame_num)
         Seg_Tracker.curr_idx = refine_idx
-        predicted_mask, masked_frame = Seg_Tracker.seg_acc_click(
-                                                        origin_frame=origin_frame,
+        predicted_mask, masked_frame = Seg_Tracker.seg_acc_click( 
+                                                        origin_frame=origin_frame, 
                                                         coords=np.array(prompt["points_coord"]),
                                                         modes=np.array(prompt["points_mode"]),
                                                         multimask=prompt["multimask"],
@@ -220,8 +219,8 @@ def roll_back_undo_click_stack_and_refine_seg(Seg_Tracker, origin_frame, click_s
 
 def seg_acc_click(Seg_Tracker, prompt, origin_frame):
     # seg acc to click
-    predicted_mask, masked_frame = Seg_Tracker.seg_acc_click(
-                                                      origin_frame=origin_frame,
+    predicted_mask, masked_frame = Seg_Tracker.seg_acc_click( 
+                                                      origin_frame=origin_frame, 
                                                       coords=np.array(prompt["points_coord"]),
                                                       modes=np.array(prompt["points_mode"]),
                                                       multimask=prompt["multimask"],
@@ -284,8 +283,8 @@ def roll_back_sam_click(Seg_Tracker, origin_frame, point_mode, click_stack, aot_
 
     Seg_Tracker.curr_idx = refine_idx
 
-    predicted_mask, masked_frame = Seg_Tracker.seg_acc_click(
-                                                      origin_frame=origin_frame,
+    predicted_mask, masked_frame = Seg_Tracker.seg_acc_click( 
+                                                      origin_frame=origin_frame, 
                                                       coords=np.array(prompt["points_coord"]),
                                                       modes=np.array(prompt["points_mode"]),
                                                       multimask=prompt["multimask"],
@@ -303,7 +302,7 @@ def sam_stroke(Seg_Tracker, origin_frame, drawing_board, aot_model, long_term_me
 
     if Seg_Tracker is None:
         Seg_Tracker, _ , _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
-
+    
     print("Stroke")
     mask = drawing_board["mask"]
     bbox = mask2bbox(mask[:, :, 0])  # bbox: [[x0, y0], [x1, y1]]
@@ -328,7 +327,7 @@ def gd_detect(Seg_Tracker, origin_frame, grounding_caption, box_threshold, text_
     return Seg_Tracker, masked_frame, origin_frame
 
 def segment_everything(Seg_Tracker, aot_model, long_term_mem, max_len_long_term, origin_frame, sam_gap, max_obj_num, points_per_side):
-
+    
     if Seg_Tracker is None:
         Seg_Tracker, _ , _, _ = init_SegTracker(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, origin_frame)
 
@@ -338,7 +337,7 @@ def segment_everything(Seg_Tracker, aot_model, long_term_mem, max_len_long_term,
     print("Starting the segmentation process")
     with torch.cuda.amp.autocast():
         pred_mask = Seg_Tracker.seg(origin_frame)
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available(): torch.cuda.empty_cache()
         gc.collect()
         Seg_Tracker.add_reference(origin_frame, pred_mask, frame_idx)
         Seg_Tracker.first_frame_mask = pred_mask
@@ -349,7 +348,7 @@ def segment_everything(Seg_Tracker, aot_model, long_term_mem, max_len_long_term,
 def add_new_object(Seg_Tracker):
 
     prev_mask = Seg_Tracker.first_frame_mask
-    Seg_Tracker.update_origin_merged_mask(prev_mask)
+    Seg_Tracker.update_origin_merged_mask(prev_mask)    
     Seg_Tracker.curr_idx += 1
 
     print("Ready to add new object!")
@@ -370,7 +369,7 @@ def res_by_num(input_video, input_img_seq, frame_num):
 
         cap = cv2.VideoCapture(input_video)
         for i in range(0,frame_num+1):
-            _, ori_frame = cap.read()
+            _, ori_frame = cap.read()  
         cap.release()
         ori_frame = cv2.cvtColor(ori_frame, cv2.COLOR_BGR2RGB)
     elif input_img_seq is not None:
@@ -441,14 +440,14 @@ def show_res_by_slider(input_video, input_img_seq, frame_per):
 def choose_obj_to_refine(input_video, input_img_seq, Seg_Tracker, frame_num, evt:gr.SelectData):
     chosen_frame_show, curr_mask, _ = res_by_num(input_video, input_img_seq, frame_num)
     # curr_mask=Seg_Tracker.first_frame_mask
-
+    
     if curr_mask is not None and chosen_frame_show is not None:
         idx = curr_mask[evt.index[1],evt.index[0]]
         curr_idx_mask = np.where(curr_mask == idx, 1, 0).astype(np.uint8)
         chosen_frame_show = draw_points(points=np.array([[evt.index[0],evt.index[1]]]), modes=np.array([[1]]), frame=chosen_frame_show)
         chosen_frame_show = draw_outline(mask=curr_idx_mask, frame=chosen_frame_show)
         print(idx)
-
+    
     return chosen_frame_show, idx
 
 def show_chosen_idx_to_refine(aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side, input_video, input_img_seq, Seg_Tracker, frame_num, idx):
@@ -465,7 +464,7 @@ def show_chosen_idx_to_refine(aot_model, long_term_mem, max_len_long_term, sam_g
     # segtracker_args["sam_gap"] = sam_gap
     # segtracker_args["max_obj_num"] = max_obj_num
     # sam_args["generator_args"]["points_per_side"] = points_per_side
-
+    
     # Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
     Seg_Tracker.restart_tracker()
     Seg_Tracker.curr_idx = 1
@@ -478,7 +477,7 @@ def show_chosen_idx_to_refine(aot_model, long_term_mem, max_len_long_term, sam_g
     Seg_Tracker.sam.have_embedded = False
     Seg_Tracker.sam.interactive_predictor.features = None
     return ori_frame, Seg_Tracker, ori_frame, [[], []], ""
-
+    
 
 
 
@@ -518,7 +517,7 @@ def seg_track_app():
                 tab_video_input = gr.Tab(label="Video type input")
                 with tab_video_input:
                     input_video = gr.Video(label='Input video').style(height=550)
-
+                
                 tab_img_seq_input = gr.Tab(label="Image-Seq type input")
                 with tab_img_seq_input:
                     with gr.Row():
@@ -559,7 +558,7 @@ def seg_track_app():
                                     label="Point Prompt",
                                     interactive=True)
 
-                        # args for modify and tracking
+                        # args for modify and tracking 
                         click_undo_but = gr.Button(
                                     value="Undo",
                                     interactive=True
@@ -578,7 +577,7 @@ def seg_track_app():
                         #                 value="Reset",
                         #                 interactive=True
                         #                         )
-
+                
                 tab_text = gr.Tab(label="Text")
                 with tab_text:
                     grounding_caption = gr.Textbox(label="Detection Prompt")
@@ -603,7 +602,7 @@ def seg_track_app():
                     audio_grounding_button = gr.Button(value="ground the sound-making object", interactive=True)
 
                 with gr.Row():
-                    with gr.Column(scale=0.5):
+                    with gr.Column(scale=0.5): 
                         with gr.Tab(label="SegTracker Args"):
                             # args for tracking in video do segment-everthing
                             points_per_side = gr.Slider(
@@ -647,10 +646,10 @@ def seg_track_app():
                                 max_len_long_term = gr.Slider(label="max len of long term memory", minimum=1, maximum=9999, value=9999, step=1)
 
 
-
+                    
                     with gr.Column():
                         new_object_button = gr.Button(
-                            value="Add new object",
+                            value="Add new object", 
                             interactive=True
                         )
                         reset_button = gr.Button(
@@ -692,7 +691,7 @@ def seg_track_app():
                                                 label="Point Prompt",
                                                 interactive=True)
 
-                                    # args for modify and tracking
+                                    # args for modify and tracking 
                                     roll_back_click_undo_but = gr.Button(
                                                 value="Undo",
                                                 interactive=True
@@ -727,7 +726,7 @@ def seg_track_app():
                 input_first_frame, origin_frame, drawing_board, grounding_caption
             ]
         )
-
+        
         #-------------- Input compont -------------
         tab_video_input.select(
             fn = clean,
@@ -777,7 +776,7 @@ def seg_track_app():
             inputs=[
                 aot_model,
                 long_term_mem,
-                max_len_long_term,
+                max_len_long_term, 
                 sam_gap,
                 max_obj_num,
                 points_per_side,
@@ -787,9 +786,9 @@ def seg_track_app():
                 Seg_Tracker, input_first_frame, click_stack, grounding_caption
             ],
             queue=False,
-
+            
         )
-
+        
         tab_click.select(
             fn=init_SegTracker,
             inputs=[
@@ -900,7 +899,7 @@ def seg_track_app():
                 input_first_frame,
             ],
             )
-
+        
         # Interactively modify the mask acc click
         input_first_frame.select(
             fn=sam_click,
@@ -937,11 +936,11 @@ def seg_track_app():
 
         # Use grounding-dino to detect object
         detect_button.click(
-            fn=gd_detect,
+            fn=gd_detect, 
             inputs=[
                 Seg_Tracker, origin_frame, grounding_caption, box_threshold, text_threshold,
                 aot_model, long_term_mem, max_len_long_term, sam_gap, max_obj_num, points_per_side
-                ],
+                ], 
             outputs=[
                 Seg_Tracker, input_first_frame
                 ]
@@ -984,14 +983,14 @@ def seg_track_app():
             ],
             outputs=[output_res, refine_idx]
         )
-
+        
 
         roll_back_button.click(
             fn=show_chosen_idx_to_refine,
             inputs=[
                 aot_model,
                 long_term_mem,
-                max_len_long_term,
+                max_len_long_term, 
                 sam_gap,
                 max_obj_num,
                 points_per_side,
@@ -1021,7 +1020,7 @@ def seg_track_app():
             outputs=[
                Seg_Tracker, refine_res, click_stack
             ]
-        )
+        ) 
 
         refine_res.select(
             fn=roll_back_sam_click,
@@ -1058,7 +1057,7 @@ def seg_track_app():
 
         # ----------------- Reset and Undo ---------------------------
 
-        # Rest
+        # Rest 
         reset_button.click(
             fn=init_SegTracker,
             inputs=[
@@ -1075,7 +1074,7 @@ def seg_track_app():
             ],
             queue=False,
             show_progress=False
-        )
+        ) 
 
 
 
@@ -1093,7 +1092,7 @@ def seg_track_app():
         #     ],
         #     queue=False,
         #     show_progress=False
-        # )
+        # ) 
 
         # click_reset_but.click(
         #     fn=init_SegTracker,
@@ -1109,7 +1108,7 @@ def seg_track_app():
         #     ],
         #     queue=False,
         #     show_progress=False
-        # )
+        # ) 
 
         # stroke_reset_but.click(
         #     fn=init_SegTracker_Stroke,
@@ -1159,7 +1158,7 @@ def seg_track_app():
                Seg_Tracker, input_first_frame, click_stack
             ]
         )
-
+        
         with gr.Tab(label='Video example'):
             gr.Examples(
                 examples=[
@@ -1172,7 +1171,7 @@ def seg_track_app():
                     ],
                 inputs=[input_video],
             )
-
+        
         with gr.Tab(label='Image-seq expamle'):
             gr.Examples(
                 examples=[
@@ -1180,7 +1179,7 @@ def seg_track_app():
                 ],
                 inputs=[input_img_seq],
             )
-
+    
     app.queue(concurrency_count=1)
     app.launch(debug=True, enable_queue=True, share=True)
 
