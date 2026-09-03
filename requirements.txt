@@ -1,0 +1,6 @@
+# Install PyTorch separately using:
+# https://pytorch.org/get-started/locally/
+
+transformers
+opencv-python-headless
+gradio

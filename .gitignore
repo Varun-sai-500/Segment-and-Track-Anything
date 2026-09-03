@@ -1,3 +1,99 @@
+<<<<<<< HEAD
+# ==========================================
+# 1. Python & Bytecode Caches
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# 2. Virtual Environments
+# ==========================================
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# ==========================================
+# 3. Heavy Media, Datasets & Checkpoints
+# ==========================================
+# Media files (Prevent baking test videos into git)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.flv
+
+# Model checkpoints & raw archives
+*.pth
+*.pt
+*.bin
+*.onnx
+*.engine
+*.safetensors
+*.zip
+*.tar.gz
+*.tar
+*.gz
+*.7z
+
+# Local media asset folders (e.g., test clips, pipeline outputs)
+assets/
+data/
+outputs/
+temp/
+tmp/
+
+# ==========================================
+# 4. IDE, OS & Editor Junk
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==========================================
+# 5. Testing & Environment Variables
+# ==========================================
+.env
+.env.local
+.env.production
+.pytest_cache/
+.coverage
+htmlcov/
+=======
 .vscode
 ckpt/*
 assets/*masks
@@ -13,3 +109,4 @@ cym_utils
 /aot/pretrain_models
 /aot/datasets
 /venv
+>>>>>>> c4992261d0d1c6e0a6e3f2c0eec9e65c78474987

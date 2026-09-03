@@ -1,26 +1,28 @@
-FROM pytorch/pytorch:2.0.1-cuda11.8-cudnn8-devel
+FROM pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime
 
+<<<<<<< HEAD
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+=======
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_HOME=/usr/local/cuda
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+>>>>>>> c4992261d0d1c6e0a6e3f2c0eec9e65c78474987
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    git \
-    ffmpeg \
-    wget \
-    curl \
-    ca-certificates \
-    python3-dev && \
-    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
-WORKDIR /workspace
+COPY requirements.txt .
+
+RUN python -m pip install --break-system-packages --upgrade pip && \
+    python -m pip install --break-system-packages --no-cache-dir -r requirements.txt
 
 COPY . .
 
+<<<<<<< HEAD
+CMD ["python", "app.py"]
+=======
 RUN python -m pip install --upgrade pip setuptools==80.9.0 wheel
 
 RUN pip install --no-cache-dir \
@@ -50,3 +52,4 @@ RUN git clone -b main https://github.com/IDEA-Research/GroundingDINO.git && \
 
 
 CMD ["python", "app.py"]
+>>>>>>> c4992261d0d1c6e0a6e3f2c0eec9e65c78474987

@@ -1,75 +1,30 @@
-# Explanation of generator_args is in sam/segment_anything/automatic_mask_generator.py: SamAutomaticMaskGenerator
-import os
-import glob
+import torch
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CKPT_DIR = os.path.join(BASE_DIR, "ckpt")
-
-if not os.path.exists(CKPT_DIR):
-    raise RuntimeError(f"Checkpoint folder not found: {CKPT_DIR}")
-
-def find_sam_checkpoint(folder=CKPT_DIR):
-    files = glob.glob(os.path.join(folder, "*.pth"))
-
-    for f in files:
-        name = os.path.basename(f).lower()
-        if name.startswith("sam_"):
-            return f
-
-    raise FileNotFoundError("No SAM checkpoint found inside ckpt folder")
-
-def infer_sam_type(path):
-    name = os.path.basename(path).lower()
-
-    if "vit_h" in name:
-        return "vit_h"
-    if "vit_l" in name:
-        return "vit_l"
-    if "vit_b" in name:
-        return "vit_b"
-
-    raise ValueError(f"Unknown SAM model type in filename: {name}")
-
-def find_deaot_checkpoint(folder=CKPT_DIR):
-    files = glob.glob(os.path.join(folder, "*.pth"))
-
-    for f in files:
-        name = os.path.basename(f).lower()
-
-        if "deaot" in name and "pre_ytb_dav" in name:
-            return f
-
-    raise FileNotFoundError(
-        "No DeAOT PRE_YTB_DAV checkpoint found in ckpt folder"
-    )
-
-def infer_deaot_model(path):
-    name = os.path.basename(path).lower()
-
-    # size
-    if "deaott" in name:
-        size = "t"
-    elif "deaots" in name:
-        size = "s"
-    elif "deaotb" in name:
-        size = "b"
-    else:
-        size = "l"
-
-    # backbone
-    if "r50" in name:
-        backbone = "r50"
-    elif "swin" in name:
-        backbone = "swinb"
-    else:
-        backbone = "r50"
-
-    return f"{backbone}_deaot{size}"
-
-sam_ckpt = find_sam_checkpoint()
-deaot_ckpt = find_deaot_checkpoint()
+device = (
+    "cuda" if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available()
+    else "cpu"
+)
 
 sam_args = {
+<<<<<<< HEAD
+    "model_id": "facebook/sam-vit-base",
+    "device": device,
+}
+
+dino_args = {
+    "model_id": "IDEA-Research/grounding-dino-base",
+    "device": device,
+}
+
+deaot_args = {
+    "repo_id": "Varun-Sai-500/DeAOT",
+    "model_filename": "R50_DeAOT-L_inference.pth",
+    "device": device,
+    "long_term_mem_gap": 9999,
+    "short_term_mem_skip": 1,
+    "max_len_long_term": 9999,
+=======
     'sam_checkpoint': sam_ckpt,
     'model_type': infer_sam_type(sam_ckpt),
     'generator_args':{
@@ -95,4 +50,5 @@ segtracker_args = {
     'min_area': 200, # minimal mask area to add a new mask as a new object
     'max_obj_num': 255, # maximal object number to track in a video
     'min_new_obj_iou': 0.8, # the background area ratio of a new object should > 80%
+>>>>>>> c4992261d0d1c6e0a6e3f2c0eec9e65c78474987
 }
