@@ -35,8 +35,15 @@ class DeAOTEngine(nn.Module):
 
         self.restart_engine()
 
+    # ------------------------------------------------------------------
+    # Encoding / identity
+    # ------------------------------------------------------------------
+
     def encode_one_img_mask(self, img, mask=None):
-        curr_enc_embs = self.DeAOT.encode_image(img)
+        if img is None:
+            curr_enc_embs = None
+        else:
+            curr_enc_embs = self.DeAOT.encode_image(img)
 
         if mask is not None:
             curr_one_hot_mask = one_hot_mask(
@@ -63,28 +70,49 @@ class DeAOTEngine(nn.Module):
 
         return id_emb
 
+    # ------------------------------------------------------------------
+    # Reference
+    # ------------------------------------------------------------------
+
     def add_reference_frame(
         self,
         img,
         mask,
         obj_nums,
         frame_step=-1,
+        img_embs=None,
     ):
         if isinstance(obj_nums, list):
             obj_nums = obj_nums[0]
+
         self.obj_nums = obj_nums
 
         if frame_step != -1:
             self.frame_step = frame_step
 
-        curr_enc_embs, curr_one_hot_mask = (
-            self.encode_one_img_mask(
-                img,
-                mask,
+        if img_embs is None:
+            curr_enc_embs, curr_one_hot_mask = (
+                self.encode_one_img_mask(
+                    img,
+                    mask,
+                )
             )
-        )
+        else:
+            curr_enc_embs = img_embs
+            _, curr_one_hot_mask = (
+                self.encode_one_img_mask(
+                    img,
+                    mask,
+                )
+            )
 
         if self.input_size_2d is None:
+            if img is None:
+                raise RuntimeError(
+                    "Input size is not initialized and no reference "
+                    "image was provided."
+                )
+
             self.update_size(
                 img.shape[-2:],
                 curr_enc_embs[-1].shape[-2:],
@@ -114,9 +142,14 @@ class DeAOTEngine(nn.Module):
             lstt_short_memories,
         ) = self.curr_lstt_output
 
-        self.long_term_memories = (
-            lstt_long_memories
-        )
+        if self.long_term_memories is None:
+            self.long_term_memories = (
+                lstt_long_memories
+            )
+        else:
+            self.update_long_term_memory(
+                lstt_long_memories
+            )
 
         self.last_mem_step = self.frame_step
 
@@ -127,11 +160,13 @@ class DeAOTEngine(nn.Module):
         self.short_term_memories = (
             lstt_short_memories
         )
+
     @torch.no_grad()
     def add_reference_frame_incremental(
         self,
         mask,
         obj_nums,
+        frame_step=-1,
     ):
         if self.obj_nums is None:
             raise RuntimeError(
@@ -139,20 +174,38 @@ class DeAOTEngine(nn.Module):
                 "tracking is initialized"
             )
 
-        self.obj_nums = obj_nums
+        if obj_nums <= self.obj_nums:
+            raise ValueError(
+                f"Incremental reference must increase "
+                f"object count: current={self.obj_nums}, "
+                f"new={obj_nums}."
+            )
 
-        self.update_short_term_memory(
-            mask,
-            skip_long_term_update=True,
+        if self.curr_enc_embs is None:
+            raise RuntimeError(
+                "No current frame embeddings are available "
+                "for incremental reference initialization."
+            )
+
+        self.add_reference_frame(
+            img=None,
+            mask=mask,
+            obj_nums=obj_nums,
+            frame_step=frame_step,
+            img_embs=self.curr_enc_embs,
         )
 
-    def update_long_term_memory(self, new_memories):
-        token_num = new_memories[0][0].shape[0]
 
-        if self.curr_lstt_output is None:
-            raise RuntimeError(
-                "add_reference_frame() must be called before update_short_term_memory()"
-            )
+    # ------------------------------------------------------------------
+    # Long-term memory
+    # ------------------------------------------------------------------
+
+    def update_long_term_memory(self, new_memories):
+        if self.long_term_memories is None:
+            self.long_term_memories = new_memories
+            return
+
+        token_num = new_memories[0][0].shape[0]
 
         updated = []
 
@@ -189,6 +242,10 @@ class DeAOTEngine(nn.Module):
 
         self.long_term_memories = updated
 
+    # ------------------------------------------------------------------
+    # Short-term memory
+    # ------------------------------------------------------------------
+
     def update_short_term_memory(
         self,
         curr_mask,
@@ -199,6 +256,12 @@ class DeAOTEngine(nn.Module):
                 "add_reference_frame() must be called before "
                 "update_short_term_memory()"
             )
+
+        if self.curr_lstt_output is None:
+            raise RuntimeError(
+                "No current LSTT output is available."
+            )
+
         curr_one_hot_mask = one_hot_mask(
             curr_mask,
             self.max_obj_num,
@@ -208,6 +271,9 @@ class DeAOTEngine(nn.Module):
             curr_one_hot_mask
         )
 
+        # IMPORTANT:
+        # curr_lstt_output is the raw output of the most recent
+        # LSTT_forward(). Do not mutate it here.
         lstt_curr_memories = (
             self.curr_lstt_output[1]
         )
@@ -224,7 +290,7 @@ class DeAOTEngine(nn.Module):
                 curr_id_v,
             ) = memories
 
-            curr_id_k, curr_id_v = (
+            fused_id_k, fused_id_v = (
                 self.DeAOT.LSTT
                 .layers[layer_idx]
                 .fuse_key_value_id(
@@ -233,9 +299,6 @@ class DeAOTEngine(nn.Module):
                     curr_id_emb,
                 )
             )
-
-            memories[2] = curr_id_k
-            memories[3] = curr_id_v
 
             memories_2d.append([
                 seq_to_2d(
@@ -248,14 +311,14 @@ class DeAOTEngine(nn.Module):
                 ),
                 (
                     seq_to_2d(
-                        curr_id_k,
+                        fused_id_k,
                         self.enc_size_2d,
                     )
-                    if curr_id_k is not None
+                    if fused_id_k is not None
                     else None
                 ),
                 seq_to_2d(
-                    curr_id_v,
+                    fused_id_v,
                     self.enc_size_2d,
                 ),
             ])
@@ -273,6 +336,7 @@ class DeAOTEngine(nn.Module):
         self.short_term_memories = (
             self.short_term_memories_list[-1]
         )
+
         if (
             self.frame_step - self.last_mem_step
             >= self.long_term_mem_gap
@@ -281,8 +345,9 @@ class DeAOTEngine(nn.Module):
                 self.update_long_term_memory(
                     lstt_curr_memories
                 )
-                self.last_mem_step = self.frame_step
-
+                self.last_mem_step = (
+                    self.frame_step
+                )
 
     def update_memory(
         self,
@@ -294,11 +359,18 @@ class DeAOTEngine(nn.Module):
             skip_long_term_update=skip_long_term_update,
         )
 
+    # ------------------------------------------------------------------
+    # Propagation / decoding
+    # ------------------------------------------------------------------
+
+    @torch.no_grad()
     def match_propogate_one_frame(self, img):
         if self.obj_nums is None:
             raise RuntimeError(
-                "add_reference_frame() must be called before track()"
+                "add_reference_frame() must be called "
+                "before track()"
             )
+
         self.frame_step += 1
 
         curr_enc_embs, _ = (
@@ -310,6 +382,7 @@ class DeAOTEngine(nn.Module):
 
         self.curr_enc_embs = curr_enc_embs
 
+        # Produces a fresh raw curr_lstt_output.
         self.curr_lstt_output = (
             self.DeAOT.LSTT_forward(
                 curr_enc_embs,
@@ -319,10 +392,15 @@ class DeAOTEngine(nn.Module):
             )
         )
 
-    def decode_current_logits(self, output_size=None):
-        pred_id_logits = self.DeAOT.decode_id_logits(
-            self.curr_lstt_output[0],
-            self.curr_enc_embs,
+    def decode_current_logits(
+        self,
+        output_size=None,
+    ):
+        pred_id_logits = (
+            self.DeAOT.decode_id_logits(
+                self.curr_lstt_output[0],
+                self.curr_enc_embs,
+            )
         )
 
         pred_id_logits[
@@ -342,17 +420,23 @@ class DeAOTEngine(nn.Module):
 
         return pred_id_logits
 
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
     def restart_engine(self):
         self.batch_size = 1
         self.frame_step = 0
         self.last_mem_step = -1
 
         self.obj_nums = None
+
         self.enc_size_2d = None
         self.enc_hw = None
         self.input_size_2d = None
 
         self.long_term_memories = None
+
         self.short_term_memories_list = []
         self.short_term_memories = None
 
@@ -360,9 +444,14 @@ class DeAOTEngine(nn.Module):
         self.curr_id_embs = None
         self.curr_one_hot_mask = None
         self.curr_lstt_output = None
+
         self.pred_id_logits = None
 
-    def update_size(self, input_size, enc_size):
+    def update_size(
+        self,
+        input_size,
+        enc_size,
+    ):
         self.input_size_2d = input_size
         self.enc_size_2d = enc_size
         self.enc_hw = (
