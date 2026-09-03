@@ -15,12 +15,22 @@ cd ..
 # The Torch versions below are recommended and should be kept the same.
 # Only change the wheel index (cu118, cu121, cu124, cu128, cpu, etc.).
 
-python -m pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
-python -m pip install transformers==4.48.3
-python -m pip install hf_xet==1.5.1
+python -m pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+python -m pip install transformers==4.30.2
+python -m pip install addict==2.4.0
+python -m pip install yapf==0.40.2
 python -m pip install timm==1.0.27
-python -m pip install opencv-python==4.10.0.84
+python -m pip install numpy==1.26.4
+python -m pip install opencv-python-headless==4.10.0.84
 python -m pip install Pillow==10.4.0
+python -m pip install matplotlib==3.9.2
+python -m pip install supervision==0.22.0
+python -m pip install pycocotools==2.0.8
+python -m pip install soundfile==0.13.1
+
+cd GroundingDINO
+python -m pip install -e . --no-build-isolation
+cd ..
 
 # Install other lib
 python -m pip install \
@@ -29,9 +39,6 @@ gradio_client==0.5.0 \
 pydantic==1.10.13 \
 fastapi==0.100.1 \
 starlette==0.27.0 \
-wget \
-gdown
+gdown==6.1.0
 
-# Install AST
-git clone https://github.com/YuanGongND/ast.git ast_master
-cp ./prepare.py ./ast_master
+# ffmpeg - readme

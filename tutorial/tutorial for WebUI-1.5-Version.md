@@ -5,7 +5,16 @@
 
 
 ## Text-Prompts
-### 1. Switch to Text-Tab by clicking `Text` Tab
+### 1. Clone Grounding-DINO to project root
+```
+git clone -b main https://github.com/IDEA-Research/GroundingDINO.git
+cd GroundingDINO
+python -m pip install -e . --no-build-isolation
+cd ..
+
+```
+
+### 2. Switch to Text-Tab by clicking `Text` Tab
 
 <p align="center">
 <img src="./img/switch2textT.jpg" height="400">
