@@ -1,50 +1,50 @@
-# Third-Party Notices
+Third-Party Notices
 
-This file identifies third-party software, source code, and pretrained model artifacts used by this project. It is provided for attribution and licensing information and does not replace the license terms accompanying those components.
-Each third-party component remains subject to its respective license.
+This project incorporates or depends on third-party models and source code. The following notices are provided in accordance with the licensing terms of those components.
 
-## Segment Anything (SAM)
+1. Segment Anything Model (SAM)
+Component: facebook/sam-vit-base
+Source: https://huggingface.co/facebook/sam-vit-base
+Provider: Meta AI (FAIR)
+Usage in this project: Loaded via the Hugging Face transformers library for segmentation.
+License: Apache License 2.0
+Copyright: Copyright (c) Meta Platforms, Inc. and affiliates.
 
-This project uses the following Hugging Face model:
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 
-- Model: `facebook/sam-vit-base`
-- Platform: Hugging Face
-- License: Apache License 2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
-Model repository:
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-https://huggingface.co/facebook/sam-vit-base
+2. Grounding DINO
+Component: IDEA-Research/grounding-dino-base
+Model repository: https://huggingface.co/IDEA-Research/grounding-dino-base
+Provider: IDEA Research
+Usage in this project: Loaded via the Hugging Face transformers library for open-vocabulary object detection.
+License: Apache License 2.0
+Copyright: Copyright (c) IDEA Research.
 
-The original SAM source implementation is not included in this project.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 
-## GroundingDINO
+http://www.apache.org/licenses/LICENSE-2.0
 
-This project uses the following Hugging Face model:
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-- Model: `IDEA-Research/grounding-dino-base`
-- Platform: Hugging Face
-- License: Apache License 2.0
+3. DeAOT Tracker (adapted from AOT-Benchmark)
+Component: DeAOT tracking implementation, adapted from source
+Original repository: https://github.com/yoxu515/aot-benchmark
+Copyright: Copyright (c) 2020, z-x-yang
+License: BSD 3-Clause License
+Modifications: The implementation in this repository has been substantially modified from the upstream source. It has been trimmed and specialized to support a single model configuration rather than the general-purpose, multi-model design of the original codebase. As such, this is a derivative work of the original AOT-Benchmark project.
 
-Model repository:
+BSD 3-Clause License
 
-https://huggingface.co/IDEA-Research/grounding-dino-base
+Copyright (c) 2020, z-x-yang All rights reserved.
 
-## DeAOT
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
-This project incorporates portions of the DeAOT implementation which are modified in this project:
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
-- Repository: https://github.com/yoxu515/aot-benchmark
-- License: BSD 3-Clause License
-- Copyright: Copyright (c) 2020, z-x-yang
-
-The incorporated portions remain subject to the original BSD 3-Clause
-License. The applicable copyright and license notices are retained
-where required.
-
-## Model Licensing
-
-Pretrained model weights and other model artifacts may have terms
-that are separate from the license of this application's source code.
-
-Users who redistribute pretrained model artifacts should refer to
-the license and usage terms of the corresponding model repository.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
