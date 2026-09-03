@@ -29,9 +29,9 @@ Model repository:
 
 https://huggingface.co/IDEA-Research/grounding-dino-base
 
-## AOT / DeAOT
+## DeAOT
 
-This project incorporates portions of the AOT/DeAOT implementation which are modified in this project:
+This project incorporates portions of the DeAOT implementation which are modified in this project:
 
 - Repository: https://github.com/yoxu515/aot-benchmark
 - License: BSD 3-Clause License
