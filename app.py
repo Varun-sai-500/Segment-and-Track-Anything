@@ -1,67 +1,56 @@
-from PIL.ImageOps import colorize, scale
 import gradio as gr
-import importlib
-import sys
 import os
-import pdb
 import shutil
 import zipfile
-import json
-from matplotlib.pyplot import step
-
+import gc
+import numpy as np
+import cv2
+from PIL import Image
+import torch
+import math
 
 from model_args import segtracker_args,sam_args,aot_args
 from SegTracker import SegTracker
 from tool.transfer_tools import draw_outline, draw_points
-# sys.path.append('.') 
-# sys.path.append('..')
-
-
-import cv2
-from PIL import Image
-from skimage.morphology.binary import binary_dilation
-import argparse
-import torch
-import time, math
 from seg_track_anything import aot_model2ckpt, tracking_objects_in_video, draw_mask
-import gc
-import numpy as np
-import json
 from tool.transfer_tools import mask2bbox
 
-from ast_master.prepare import ASTpredict
-
-from contextlib import nullcontext
-autocast_context = (
-    torch.amp.autocast("cuda")
-    if torch.cuda.is_available()
-    else torch.amp.autocast("mps")
-    if torch.backends.mps.is_available()
-    else nullcontext()
-)
-
-from moviepy.editor import VideoFileClip 
 def clean():
     return None, None, None, None, None, None, [[], []]
 
 def audio_to_text(input_video, label_num, threshold):
-    video = VideoFileClip(input_video)      
-    audio = video.audio      
-    video_without_audio = video.set_audio(None)      
-    video_without_audio.write_videofile("video_without_audio.mp4")        
-    audio.write_audiofile("audio.flac", codec="flac") 
+    from tool.ast_predictor import ASTpredict
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError(
+            "ffmpeg not found. Please install ffmpeg and ensure it is on PATH."
+        )
+    ffmpeg = shutil.which("ffmpeg")
+    subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-i",
+            input_video,
+            "-vn",
+            "-acodec",
+            "flac",
+            "audio.flac",
+        ],
+        check=True,
+    )
+
+
     top_labels,top_labels_probs = ASTpredict()
-    top_labels_and_probs = "{"  
-    predicted_texts = ""
-    for k in range(10):
-        if(k<label_num and top_labels_probs[k]>threshold):
-                top_labels_and_probs += f"\"{top_labels[k]}\": {top_labels_probs[k]:.4f},"
-                predicted_texts +=top_labels[k]+ ' '
-        k+=1
-    top_labels_and_probs = top_labels_and_probs[:-1]
-    top_labels_and_probs += "}"
-    top_labels_and_probs_dic = json.loads(top_labels_and_probs)
-    print(top_labels_and_probs_dic) 
+    top_labels_and_probs_dic = {}
+    predicted_texts = []
+    for k in range(min(10, len(top_labels))):
+        if k < label_num and top_labels_probs[k] > threshold:
+            top_labels_and_probs_dic[top_labels[k]] = round(
+                float(top_labels_probs[k]), 4
+            )
+            predicted_texts.append(top_labels[k])
+
+    predicted_texts = " ".join(predicted_texts)
     return predicted_texts, top_labels_and_probs_dic
 
 def get_click_prompt(click_stack, point):
@@ -345,16 +334,15 @@ def segment_everything(Seg_Tracker, aot_model, long_term_mem, max_len_long_term,
     print("Everything")
 
     frame_idx = 0
-
-    with autocast_context:
+    print("Starting the segmentation process")
+    with torch.cuda.amp.autocast():
         pred_mask = Seg_Tracker.seg(origin_frame)
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         gc.collect()
         Seg_Tracker.add_reference(origin_frame, pred_mask, frame_idx)
         Seg_Tracker.first_frame_mask = pred_mask
-
     masked_frame = draw_mask(origin_frame.copy(), pred_mask)
-
+    print("Segmentation done!")
     return Seg_Tracker, masked_frame
 
 def add_new_object(Seg_Tracker):

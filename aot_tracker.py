@@ -8,8 +8,7 @@ from aot.networks.engines.aot_engine import AOTEngine,AOTInferEngine
 from aot.networks.engines.deaot_engine import DeAOTEngine,DeAOTInferEngine
 import importlib
 import numpy as np
-from PIL import Image
-from skimage.morphology.binary import binary_dilation
+
 
 np.random.seed(200)
 _palette = ((np.random.random((3*255))*0.7+0.3)*255).astype(np.uint8).tolist()
@@ -22,44 +21,28 @@ from aot.networks.engines import build_engine
 from torchvision import transforms
 
 class AOTTracker(object):
-    def __init__(self, cfg, device="cuda"):
-        if device == "cuda" and not torch.cuda.is_available():
-            if torch.backends.mps.is_available():
-                print("CUDA not available. Falling back to MPS.")
-                device = "mps"
-            else:
-                print("CUDA not available. Falling back to CPU.")
-                device = "cpu"
-
-        self.device = torch.device(device)
-
-        self.model = build_vos_model(cfg.MODEL_VOS, cfg).to(self.device)
-
-        self.model, _ = load_network(
-            self.model,
-            cfg.TEST_CKPT_PATH,
-            self.device,
-        )
-
-        self.engine = build_engine(
-            cfg.MODEL_ENGINE,
-            phase="eval",
-            aot_model=self.model,
-            device=self.device,
-            short_term_mem_skip=1,
-            long_term_mem_gap=cfg.TEST_LONG_TERM_MEM_GAP,
-            max_len_long_term=cfg.MAX_LEN_LONG_TERM,
-        )
+    def __init__(self, cfg, gpu_id=0):
+        self.gpu_id = gpu_id
+        self.model = build_vos_model(cfg.MODEL_VOS, cfg).cuda(gpu_id)
+        self.model, _ = load_network(self.model, cfg.TEST_CKPT_PATH, gpu_id)
+        # self.engine = self.build_tracker_engine(cfg.MODEL_ENGINE,
+        #                            aot_model=self.model,
+        #                            gpu_id=gpu_id,
+        #                            short_term_mem_skip=4,
+        #                            long_term_mem_gap=cfg.TEST_LONG_TERM_MEM_GAP)
+        self.engine = build_engine(cfg.MODEL_ENGINE,
+                                   phase='eval',
+                                   aot_model=self.model,
+                                   gpu_id=gpu_id,
+                                   short_term_mem_skip=1,
+                                   long_term_mem_gap=cfg.TEST_LONG_TERM_MEM_GAP,
+                                   max_len_long_term=cfg.MAX_LEN_LONG_TERM)
 
         self.transform = transforms.Compose([
-            tr.MultiRestrictSize(
-                cfg.TEST_MAX_SHORT_EDGE,
-                cfg.TEST_MAX_LONG_EDGE,
-                cfg.TEST_FLIP,
-                cfg.TEST_MULTISCALE,
-                cfg.MODEL_ALIGN_CORNERS,
-            ),
-            tr.MultiToTensor(),
+            tr.MultiRestrictSize(cfg.TEST_MAX_SHORT_EDGE,
+                                 cfg.TEST_MAX_LONG_EDGE, cfg.TEST_FLIP,
+                                 cfg.TEST_MULTISCALE, cfg.MODEL_ALIGN_CORNERS),
+            tr.MultiToTensor()
         ])
 
         self.model.eval()
