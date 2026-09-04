@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/Varun-sai-500/Segment-and-Track-Anything:latest
+    image: ghcr.io/Varun-sai-500/segment-and-track-anything:latest
     ports:
       - "7860:7860"
     gpus: all
