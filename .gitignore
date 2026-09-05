@@ -60,7 +60,6 @@ venv.bak/
 *.7z
 
 # Local media asset folders (e.g., test clips, pipeline outputs)
-assets/
 data/
 outputs/
 temp/
