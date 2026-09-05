@@ -1,312 +1,242 @@
-# Segment and Track Anything (SAM-Track)
-**Online Demo:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R10N70AJaslzADFqb-a5OihYkllWEVxB?usp=sharing)
-**Technical Report**: [![](https://img.shields.io/badge/Report-arXiv:2305.06558-green)](https://arxiv.org/abs/2305.06558)
+# Segment and Track Anything
 
-**Tutorial:** [tutorial-v1.6(audio)](./tutorial/tutorial%20for%20WebUI-1.6-Version.md),[tutorial-v1.5 (Text)](./tutorial/tutorial%20for%20WebUI-1.5-Version.md), [tutorial-v1.0 (Click & Brush)](./tutorial/tutorial%20for%20WebUI-1.0-Version.md)
+> A modernized, lightweight refactor of **Segment and Track Anything (SAM-Track)**.
+> Engineered for high-accuracy, non-real-time mask propagation — built on clean and modern PyTorch and Hugging Face backends with zero legacy dependency debt.
+
+## Introduction
+
+**Segment-and-Track-Anything** is a video segmentation and tracking framework designed to segment and track objects throughout a video. It brings together interactive and automatic methods for selecting objects of interest and maintaining their segmentation across frames.
+
+The project is built around the idea of combining powerful image-level segmentation with dedicated video tracking. The original Segment and Track Anything (SAM-Track) framework combines the Segment Anything Model (SAM) for obtaining object masks on reference frames with DeAOT, an AOT-based video object tracking model, to propagate those masks across subsequent frames. It also integrates Grounding-DINO to enable text-guided object selection.
+
+This project is a substantially refactored implementation of the original SAM-Track software. The underlying segmentation and tracking approach is preserved, while the application and inference stack have been redesigned around modern model backends, explicit object state, streaming execution, and a substantially smaller dependency and model footprint.
+
+## What Changed
+
+Legacy `SegTracker` vs modern refactored `Pipeline`
+
+
+\| Dimension | \`SegTracker\` (legacy) | \`Pipeline\` (refactored) |
+
+\|---|---|---|
+
+\| **\*\*SAM / Grounding-DINO\*\*** | Vendored in-repo (\`sys.path.append("./sam")\`, \`from sam.segment\_anything import ...\`, \`from tool.detector import Detector\`) — two full external repos cloned into the project | Delegated to Hugging Face inference via a thin \`inference.sam\_segmentor\` / \`inference.dino\_detector\` HF wrappers — no vendored clones. |
+
+\| **\*\*"Segment everything"\*\*** | \`seg()\` calls \`SAM.everything\_generator.generate(frame)\` — segments the *\*entire\** frame (sky, ground, water, debris, everything) every \`sam\_gap\` frames (default gap = 100 frames, max_obj = 255 \~3.33s @30fps), then discards most of it via \`min\_area\`/\`max\_obj\_num\` filtering | Removed entirely. No automatic mask generator anywhere. Only bounded, user-driven mask creation remains: \`seg\_acc\_click\` (point prompts) and \`detect\_and\_seg\` (Grounding-DINO boxes) |
+
+\| **\*\*Why remove it\*\*** | Segment-everything routinely proposes far more regions than can ever be tracked | DeAOT hard-caps at \~10 tracked objects by design — an unbounded whole-frame segmentation that gets immediately truncated to 10 objects is wasted GPU work on every \`sam\_gap\` boundary |
+
+\| **\*\*GC / CUDA cache calls\*\*** | \`gc.collect()\` + \`torch.cuda.empty\_cache()\` called in pairs, *\*inside the per-frame loop\**: 1 pair unconditionally every frame, +1 extra pair on frame 0, +1 extra pair every \`sam\_gap\`-th frame (both \`video\_type\_input\_tracking\` and its near-duplicate \`img\_seq\_type\_input\_tracking\`) | Zero occurrences in the class. No cache-thrash pattern in the orchestration layer at all |
+
+\| **\*\*Cost of that pattern\*\*** | ≈2 calls/frame baseline, spiking to 4 on frame 0 and every \`sam\_gap\`-th frame — for a 1,000-frame clip that's on the order of 1,000+ full GC passes plus 1,000+ CUDA allocator flushes, most of them on frames where nothing was even allocated | N/A — device/memory concerns pushed down into the tracker module instead of scattered through the video loop |
+
+| **\*\*\*\*Model loading\*\*\*\*** | Models are initialized eagerly through `SegTracker` setup, loading the segmentation, detection, and tracking components regardless of which functionality is actually used | Models are loaded lazily by their respective inference modules, initializing a model only when that capability is first requested | **\*\*\*\*Lazy model initialization:\*\*\*\*** avoids loading unused models at startup, reducing initial memory usage and startup time |
+
+\| **\*\*Device support\*\*** | \`DEVICE = torch.device("cuda" if torch.cuda.is\_available() else "cpu")\` — binary CUDA/CPU only; \`autocast\` only enabled under CUDA (\`nullcontext\` otherwise) → no Apple Silicon acceleration path | Device selection and autocast live in \`deaot\_tracker.Tracker\`, which is CUDA/MPS-aware — \`Pipeline\` itself is hardware-agnostic |
+
+\| **\*\*Video decode passes\*\*** | **\*\*Two\*\*** full decodes of the same input: pass 1 runs inference and builds \`pred\_list\`; pass 2 *\*reopens\** \`cv2.VideoCapture(input\_video)\` from frame 0 purely to render masks, write per-frame PNGs, build the output video, and build the gif frame list | **\*\*One\*\*** decode. \`track\_video\_sequence\` is a single generator over \`\_get\_frame\_source\`, rendering and \`yield\`-ing \`(masked\_frame, frame\_idx)\` inline, in the same pass as inference |
+
+| **\*\*\*\*DeAOT codebase\*\*\*\*** | Full AOT benchmark repository with generic training infrastructure, multiple model variants, training utilities, configs, datasets, and other unused components — 30+ files carried into the project | Stripped down to the single supported DeAOT inference path, with the generic training infrastructure and unused model variants removed — approximately 10 files remain | **\*\*\*\*Inference-only model stack:\*\*\*\*** removes the generic training/benchmark infrastructure and retains only the code required to run the selected DeAOT tracker |
+
+\| **\*\*Output artifacts\*\*** | Mask PNGs per frame, masked-frame PNGs per frame, output \`.mp4\`, output \`.gif\` (via \`imageio\`), **\*\*and\*\*** a \`.zip\` of all mask PNGs — all five written unconditionally to disk | None written by the class itself — it yields frames; the Gradio caller owns persistence, so nothing is duplicated or silently overwritten by a second run |
+
+| **\*\*\*\*Inference time\*\*\*\*** | ~100 seconds to process a 3-second video on CPU | ~20 seconds to process the same 3-second video on CPU | **\*\*\*\*~5× faster CPU inference:\*\*\*\*** measured on the same 3-second video, reducing inference time from ~100s to ~20s |
+
+\| **\*\*Video vs. image-sequence input\*\*** | Two \~100-line, near-duplicate methods (\`video\_type\_input\_tracking\`, \`img\_seq\_type\_input\_tracking\`) reimplementing the entire pipeline twice, differing only in how frames are sourced | One \`\_get\_frame\_source\` contextmanager/generator handling both video (\`cv2.VideoCapture\`) and zip-based image sequences (extracted to an auto-cleaned \`tempfile.TemporaryDirectory\`) behind a single interface consumed once by \`track\_video\_sequence\` |
+
+\| **\*\*Object/id bookkeeping\*\*** | \`reference\_objs\_list\` (a running list of per-frame \`np.unique\` arrays) + \`get\_tracking\_objs()\`/\`get\_obj\_num()\` re-derive object count by scanning that whole history on every call | \`current\_mask\` is the explicit single source of truth; \`curr\_idx\` is kept consistent via \`max(self.curr\_idx, obj\_num + 1)\` at every mutation point — no historical list to replay |
+
+\| **\*\*Cancellation\*\*** | None — a run goes to completion or crashes | \`threading.Event\`-backed \`stop\_tracking()\` checked inside the frame generator, so a long-running stream can be interrupted mid-video (useful behind an interactive frontend) |
+
+\| **\*\*Input validation\*\*** | None — assumes well-formed masks/frames throughout | Explicit guards (\`ValueError\`/\`RuntimeError\` with messages) on \`None\` masks, wrong \`ndim\`, and using the tracker before initialization |
+
+\| **\*\*Progress reporting\*\*** | Inline \`print(..., end='\r')\` statements mixed into core logic | No progress logic in the pipeline — progress is exposed through the per-frame `yield`, leaving presentation entirely to the caller |
+
+\| **\*\*Dead code\*\*** | Large commented-out blocks left in place (alternate \`fourcc\` codecs, legacy \`i\_frame\_num\` skip-logic) | None |
+
+\| **\*\*Method naming\*\*** | Instance methods on \`video\_type\_input\_tracking\`/\`img\_seq\_type\_input\_tracking\` take \`SegTracker\` as their first parameter name instead of \`self\` — confusingly shadows the class name itself | Consistent \`self\`, methods grouped under clear section-comment headers (State / Object bookkeeping / DeAOT reference-tracking / Rendering / Interactive segmentation / Detection+segmentation / Video generator / Frame source) |
+
+Legacy `Dockerfile` vs modern refactored `Dockerfile`
+
+\| Dimension | \`DockerFile\` (legacy) | \`DockerFile\` (refactored) |
+
+\|---|---|---|
+| ****Container base & CUDA stack**** | `pytorch/pytorch:2.0.1-cuda11.8-cudnn8-devel` — PyTorch 2.0.1, CUDA 11.8, cuDNN 8, heavyweight development image | `pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime` — PyTorch 2.13.0, CUDA 13.2, cuDNN 9, lightweight runtime image | modernized stack: PyTorch **2.0.1 → 2.13.0**, CUDA **11.8 → 13.2**, cuDNN **8 → 9**, and `devel → runtime` |
+| ****System dependencies & build toolchain**** | Explicitly installs `build-essential`, `cmake`, `git`, `ffmpeg`, `wget`, `curl`, `python3-dev`, etc., and manually sets `CUDA_HOME` | No explicit apt toolchain; relies on the runtime base image and Python dependencies declared in `requirements.txt` | Removes unnecessary build-time/system baggage from the application image, producing a significantly cleaner deployment container |
+| ****Python dependency management**** | Large inline `pip install` block with ~20 tightly pinned packages, followed by separate editable installs for `sam` and a Git-cloned GroundingDINO repository | Dependencies centralized in `requirements.txt`, currently focused on `opencv-python-headless`, `gradio`, and Hugging Face `transformers` | modern dependency layout: Dockerfile describes **how to build**, while `requirements.txt` describes **what the application needs**; no runtime repository cloning or duplicated dependency declarations |
+| ****Build efficiency & image footprint**** | `COPY . .` occurs before dependency installation; installs development tooling and editable native projects; pip caching is not explicitly disabled | Copies `requirements.txt` first, installs with `--no-cache-dir`, then copies the application source; `PIP_NO_CACHE_DIR=1` is enabled globally | Modern Docker layering gives better dependency-layer caching, avoids pip cache bloat, removes unnecessary compiler/toolchain overhead, and produces a substantially leaner inference image |
+
+Legacy Gradio Frontend vs modern refactored Gradio Frontend
+
+| Dimension | Legacy `app.py` (Gradio 3.39) | Refactored `application.py` (Gradio 6.x) |
+|---|---|---|
+| **Gradio API generation** | `.style(height=550)`, `gr.Image(tool="sketch", brush_radius=10)`, `gr.outputs.Textbox(...)`, `app.queue(concurrency_count=1)`, `app.launch(debug=True, enable_queue=True, share=True)` — all pre-4.0 idioms, several since removed from the library | `height=` kwarg directly on components, no legacy `gr.outputs` module, `.queue()`/`.then(..., concurrency_limit=1)` chaining, `demo.queue().launch(css=..., share=False)` — current API throughout |
+| **Model configuration** | User-tunable `aot_model` dropdown (deaotb / deaotl / r50_deaotl), plus `long_term_mem`, `max_len_long_term`, `points_per_side`, `sam_gap`, `max_obj_num` sliders — a whole "SegTracker Args" panel | Fixed `deaot_args` / `dino_args` / `sam_args` module config, no model picker in the UI — one deliberately-chosen, high-accuracy DeAOT configuration, not a user-facing knob |
+| **Click → SAM invocation** | Every single click fires `sam_click` → `seg_acc_click` → one SAM call, immediately followed by `SegTracker_add_first_frame`, which calls `restart_tracker()` + `add_reference()` — i.e. a full tracker reset and re-embed per click | Clicks accumulate in `coords`/`modes`; "Add Point Group" (`add_new_object`) just delimits one object's clicks from the next with no model call; the eventual "Segment / Add Object Reference" click sends **all** accumulated point-groups in one `seg_acc_click(..., coords_groups, modes_groups)` call — N objects, 1 SAM invocation |
+| **Reference-frame commit** | `SegTracker_add_first_frame` unconditionally calls `restart_tracker()` on *every* click/stroke/detect action, discarding all previously tracked objects each time | `_commit_segmentation` diffs `prev_ids` vs `curr_ids` in the returned mask and only calls `initialize_reference` (first time) or `add_objects` (new ids only) — existing tracked objects are never silently wiped by a later action |
+| **"Everything" tab / segment-everything** | Present: `seg_every_first_frame` → `segment_everything()` → `Seg_Tracker.seg()` (SAM's whole-frame automatic mask generator), wrapped in its own `torch.cuda.amp.autocast()` + explicit `torch.cuda.empty_cache()`/`gc.collect()` right in the click handler | Removed entirely — no tab, no handler, no `points_per_side`/`sam_gap` sliders. A single DeAOT model has a hard per-clip object ceiling, so segmenting the whole frame (sky, ground, background) only to discard most of it doesn't fit the design |
+| **Stroke tab** | original: a sketch-tool drawing board (`tool="sketch"`) → `mask2bbox` → `seg_acc_bbox`, added specifically to reduce the number of individual clicks needed under the old one-click-one-SAM-call constraint | Removed — with clicks now batched per object, stroke-to-avoid-repeated-invocations is solving a problem that no longer exists |
+| **Audio Grounding tab** | original: `audio_to_text()` shells out to `ffmpeg` (subprocess) to split audio, runs an AST (`ast_master.prepare.ASTpredict`) model to get top-label probabilities, then feeds the resulting text into `gd_detect` as a Grounding-DINO prompt — a full extra model, an `ffmpeg` dependency, two sliders, and a `Label` widget | Removed entirely — text prompting already covers the same end result (a user typing "dog" gets the same Grounding-DINO call an audio label would have produced), so the extra model/dependency chain added cost without adding capability |
+| **Rollback / refine subsystem** | Present, and large: a "percentage of frames viewed" slider + `output_res` image reads back previously-written mask/frame PNGs from disk (`res_by_num`, `show_res_by_slider`); `choose_obj_to_refine` picks an object by clicking a historical frame; `show_chosen_idx_to_refine` manually resets ~9 internal `SegTracker` fields by hand instead of calling one method; a parallel set of roll-back click/undo/track handlers re-runs tracking from an arbitrary past frame | Removed entirely. Instead: **"Add Objects During Tracking"** (`pause_and_load_frame_for_segmentation`) soft-stops the live generator (`tracker.stop_tracking()`) and loads the *current* frame for new prompts — forward-only; there is no mechanism to rewind to a historical frame |
+| **Periodic re-segmentation during tracking** | Implicit and time-based: `sam_gap` re-triggers a full SAM segment-everything pass on a fixed frame interval (~100 frames / ~3.3s by default) regardless of whether a new object actually entered the scene | Explicit and user-driven: "Add Objects During Tracking" pauses the stream and lets the user hand-place prompts for exactly the new object, exactly when one appears — no periodic re-scan of the whole frame |
+| **Tracking output** | Blocking call to `tracking_objects_in_video`; UI populates static `output_video` **and** `output_mask` (a zip of mask PNGs) `gr.File` components only after the entire two-pass job finishes — no visible progress | `tracking_objects` is a generator that writes each frame to a session-scoped temp `.mp4` as it arrives and yields it straight to `output_frame` for live progress; on completion the single finished video is exposed via `output_file`. No mask zip, no gif |
+| **Output-file lifecycle** | No cleanup logic — files accumulate in `tracking_results/<name>/...` across runs | `_TRACKING_OUTPUTS` session dict + `_create_tracking_output`/`_discard_tracking_output`/`_finish_tracking_output` explicitly manage one temp file per session, discarding/removing stale output on reset or re-selection so nothing is silently duplicated or overwritten |
+| **Concurrency** | One global `app.queue(concurrency_count=1)` serializes *every* interaction in the entire app | `concurrency_limit=1` is scoped only to the tracking `.then(...)` call itself; unrelated UI interactions aren't forced through the same single-worker queue |
+| **Validation / error handling** | None — no `gr.Error` anywhere; tracking with no prior segmentation or a missing input simply fails deep inside the call stack | Explicit `gr.Error` checks: no mask before tracking, video-XOR-image-seq input, wrapped `try/except` around the tracking generator with a surfaced failure message |
+| **State reset** | `show_chosen_idx_to_refine` manually zeroes ~9 attributes on the tracker object by hand (`curr_idx`, `object_idx`, `origin_merged_mask`, `first_frame_mask`, `reference_objs_list`, `everything_points`, `everything_labels`, `sam.have_embedded`, `sam.interactive_predictor.features`) instead of one reset call | `reset_state`/`reset_SegTracker` call `tracker.restart_tracker()` once; all bookkeeping lives inside the class, not hand-mirrored in the frontend |
+| **Sharing** | `share=True` by default — every launch opens a public tunnel | `share=False` — no forced public link |
+| **Dead code / unused imports** | Unused `from matplotlib.pyplot import step`, unused `importlib`/`argparse`/`time`, duplicate `import json`, three fully commented-out reset-button handlers, commented-out `pdb.set_trace()` calls, commented-out example video paths | None found |
+| **Dependency surface** | `ast_master` package, `ffmpeg` subprocess dependency, `skimage`, direct SAM/GroundingDINO subrepo imports (carried over from the backend) | `os`, `tempfile`, `zipfile`, `cv2`, `gradio`, `numpy`, `pipeline` — no audio, no vendored model repos |
+
+
+## Architecture
 
 <p align="center">
-<img src="./assets/top.gif" width="880">
+  <img src="assets/architecture.png" width="800">
 </p>
 
-**Segment and Track Anything** is an open-source project that focuses on the segmentation and tracking of any objects in videos, utilizing both automatic and interactive methods. The primary algorithms utilized include the [**SAM** (Segment Anything Models)](https://github.com/facebookresearch/segment-anything) for automatic/interactive key-frame segmentation and the [**DeAOT** (Decoupling features in Associating Objects with Transformers)](https://github.com/yoxu515/aot-benchmark) (NeurIPS2022) for efficient multi-object tracking and propagation. The SAM-Track pipeline enables dynamic and automatic detection and segmentation of new objects by SAM, while DeAOT is responsible for tracking all identified objects.
+SAM-Track is split into two independent layers: a Gradio frontend that owns nothing but UI state, and a `Pipeline` backend that owns every model call. The frontend never talks to a model directly — it only calls into `Pipeline`, so the whole interactive surface (click prompts, text prompts, live tracking preview, file download) can change without touching a single inference call, and vice versa.
 
-## :loudspeaker:New Features
-- [2024/4/23] We have added an audio-grounding feature that tracks the sound-making object within the video's soundtrack.
-- [2023/5/12] We have authored a technical report for SAM-Track.
-- [2023/5/7] We have added `demo_instseg.ipynb`, which uses Grounding-DINO to detect new objects in the key frames of a video. It can be applied in the fields of smart cities and autonomous driving.
-- [2023/4/29] We have added advanced arguments for AOT-L: `long_term_memory_gap` and `max_len_long_term`.
-   - `long_term_memory_gap` controls the frequency at which the AOT model adds new reference frames to its long-term memory. During mask propagation, AOT matches the current frame with the reference frames stored in the long-term memory. 
-   - Setting the gap value to a proper value helps to obtain better performance. To avoid memory explosion in long videos, we set a `max_len_long_term` value for the long-term memory storage, i.e. when the number of memory frames reaches the `max_len_long_term value`, the oldest memory frame will be discarded and a new frame will be added.
+**Frontend.** The UI collects two kinds of input — point clicks and text prompts — and batches them before anything gets sent to the backend. Clicks for one object accumulate locally; an explicit "add object" action closes that group and starts the next one, so an arbitrary number of objects can be prompted before a single request goes out. Session state (accumulated prompts, the current tracker instance, the in-progress output file) lives entirely in Gradio's own state components, and tracking output is written to a session-scoped temp file that gets cleaned up on reset instead of accumulating on disk.
 
-- [2023/4/26] **Interactive WebUI 1.5-Version**: We have added new features based on Interactive WebUI-1.0 Version.
-   - We have added a new form of interactivity—text prompts—to SAMTrack.
-   - From now on, multiple objects that need to be tracked can be interactively added.
-   - Check out [tutorial](./tutorial/tutorial%20for%20WebUI-1.5-Version.md) for Interactive WebUI 1.5-Version. More demos will be released in the next few days.
-- [2023/4/26] **Image-Sequence input**: The WebUI now has a new feature that allows for input of image sequences, which can be used to test video segmentation datasets. Get started with the [tutorial](./tutorial/tutorial%20for%20Image-Sequence%20input.md) for Image-Sequence input. 
-- [2023/4/25] **Online Demo:** You can easily use SAMTrack in [Colab](https://colab.research.google.com/drive/1R10N70AJaslzADFqb-a5OihYkllWEVxB?usp=sharing) for visual tracking tasks.
+**Backend.** `Pipeline` wraps three components — a segmentor, a detector, and a tracker — behind one interface. Segmentation (SAM) and text-grounded detection (Grounding-DINO) are both delegated to hugging face, so the app never has to load or manage those models locally. Tracking (DeAOT) is the one model that actually runs on-device, with the CUDA/MPS/CPU selection handled entirely inside the tracker module — `Pipeline` itself is hardware-agnostic. A single frame-source abstraction handles both video files and zipped image sequences behind one generator, so the rest of the pipeline doesn't need to know which kind of input it's looking at.
 
-- [2023/4/23] **Interactive WebUI:** We have introduced a new WebUI that allows interactive user segmentation through strokes and clicks. Feel free to explore and have fun with the [tutorial](./tutorial/tutorial%20for%20WebUI-1.0-Version.md)!
-    - [2023/4/24] **Tutorial V1.0:** Check out our new video tutorials!
-      - YouTube-Link: [Tutorial for Interactively modify single-object mask for first frame of video](https://www.youtube.com/watch?v=DF0iFSsX8KY)、[Tutorial for Interactively add object by click](https://www.youtube.com/watch?v=UJvKPng9_DA)、[Tutorial for Interactively add object by stroke](https://www.youtube.com/watch?v=m1oFavjIaCM).
-      - Bilibili Video Link:[Tutorial for Interactively modify single-object mask for first frame of video](https://www.bilibili.com/video/BV1tM4115791/?spm_id_from=333.999.0.0)、[Tutorial for Interactively add object by click](https://www.bilibili.com/video/BV1Qs4y1A7d1/)、[Tutorial for Interactively add object by stroke](https://www.bilibili.com/video/BV1Lm4y117J4/?spm_id_from=333.999.0.0).
-    - 1.0-Version is a developer version, please feel free to contact us if you encounter any bugs :bug:.
+**Data flow.** A batched click or text prompt produces one mask from the segmentor/detector; the pipeline diffs that mask against whatever's already tracked and commits only the genuinely new object ids to the tracker's reference set. Once tracking starts, `Pipeline` yields one rendered frame at a time from a single decode pass — the frontend writes each frame to the output video as it arrives and mirrors it to a live preview, so the UI shows progress instead of blocking until the whole clip is done. Tracking can be paused mid-stream to add a newly-appeared object, then resumed, without restarting or rewinding.
 
-- [2023/4/17] **SAMTrack**: Automatically segment and track anything in video!
+The result is a clear boundary: local compute is reserved for the one model that has to run continuously frame-to-frame, while segmentation and detection are invoked only when needed, and the frontend layer remains independent of the inference backend.
 
-## :fire:Demos
-<div align=center>
+## Supported Models
 
-[![Segment-and-Track-Anything Versatile Demo](https://res.cloudinary.com/marcomontalbano/image/upload/v1681713095/video_to_markdown/images/youtube--UPhtpf1k6HA-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://youtu.be/UPhtpf1k6HA "Segment-and-Track-Anything Versatile Demo")
-</div>
+| Component | Model | Purpose |
+|---|---|---|
+| **Segmentation** | SAM | Interactive point-based image segmentation |
+| **Detection** | Grounding-DINO | Text-guided object detection |
+| **Tracking** | R50-DeAOT-L | Video mask propagation and temporal tracking |
 
-This video showcases the segmentation and tracking capabilities of SAM-Track in various scenarios, such as street views, AR, cells, animations, aerial shots, and more.
+The refactored implementation intentionally supports a single DeAOT configuration rather than carrying the full AOT benchmark and training infrastructure. Only the inference components required by the selected tracker are retained.
 
-## :calendar:TODO
- - [x] Colab notebook: Completed on April 25th, 2023.
- - [x] 1.0-Version Interactive WebUI: Completed on April 23rd, 2023.
-    - We will create a feature that enables users to interactively modify the mask for the initial video frame according to their needs. The interactive segmentation capabilities of Segment-and-Track-Anything is demonstrated in [Demo8](https://www.youtube.com/watch?v=Xyd54AngvV8&feature=youtu.be) and [Demo9](https://www.youtube.com/watch?v=eZrdna8JkoQ).
-    - Bilibili Video Link: [Demo8](https://www.bilibili.com/video/BV1JL411v7uE/), [Demo9](https://www.bilibili.com/video/BV1Qs4y1w763/).
- - [x] 1.5-Version Interactive WebUI: Completed on April 26th, 2023.
-    - We will develop a function that allows interactive modification of multi-object masks for the first frame of a video. This function will be based on Version 1.0.  YouTube: [Demo4](https://www.youtube.com/watch?v=UFtwFaOfx2I&feature=youtu.be), [Demo5](https://www.youtube.com/watch?v=cK5MPFdJdSY&feature=youtu.be); Bilibili: [Demo4](https://www.bilibili.com/video/BV17X4y127mJ/), [Demo5](https://www.bilibili.com/video/BV1Pz4y1a7mC/)
-    - Furthermore, we plan to include text prompts as an additional form of interaction. YouTube: [Demo1](https://www.youtube.com/watch?v=5oieHqFIJPc&feature=youtu.be), [Demo2](https://www.youtube.com/watch?v=nXfq17X6ohk); Bilibili: [Demo1](https://www.bilibili.com/video/BV1hg4y157yd/?vd_source=fe3b5c0215d05cc44c8eb3d94abae3ca), [Demo2](https://www.bilibili.com/video/BV1RV4y1k7i5/)
- - [ ] 2.x-Version Interactive WebUI
-    - In version 2.x, the segmentation model will offer two options: SAM and SEEM.
-    - We will develop a new function where the fixed-category object detection result can be displayed as a prompt.
-    - We will enable SAM-Track to add and modify objects during tracking. YouTube: [Demo6](https://www.youtube.com/watch?v=l7hXM1a3nEA&feature=youtu.be
-), [Demo7](https://www.youtube.com/watch?v=hPjw28Ul4cw&feature=youtu.be); Bilibili: [Demo6](https://www.bilibili.com/video/BV1nk4y1j7Am), [Demo7](https://www.bilibili.com/video/BV1mk4y1E78s/?vd_source=fe3b5c0215d05cc44c8eb3d94abae3ca)
+## Getting Started
 
-**Demo1** showcases SAM-Track's ability to take the class of objects as prompt. The user gives the category text 'panda' to enable instance-level segmentation and tracking of all objects belonging to this category.
-<div align=center>
- 
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683347297/video_to_markdown/images/youtube--5oieHqFIJPc-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=5oieHqFIJPc&feature=youtu.be "demo1")
-</div>
+Segment-and-Track-Anything supports two deployment paths:
 
-**Demo2** showcases SAM-Track's ability to take the text description as prompt. SAM-Track could segment and track target objects given the input that 'panda on the far left'.
-<div align=center>
- 
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683347643/video_to_markdown/images/youtube--nXfq17X6ohk-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=nXfq17X6ohk "demo1")
-</div>
+| Hardware | Recommended Deployment |
+| :--- | :--- |
+| **CPU** | Native Python installation |
+| **NVIDIA GPU** | Docker with the prebuilt GHCR image |
 
+> **Note:** The prebuilt Docker image is canonical GPU deployment. GPU users need not install any python dependencies manually.
 
-**Demo3** showcases SAM-Track's ability to track numerous objects at the same time. SAM-Track is capable of automatically detecting newly appearing objects.
-<div align=center>
- 
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683347961/video_to_markdown/images/youtube--jMqFMq0tRP0-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=jMqFMq0tRP0 "demo1")
-</div>
+---
 
-**Demo4** showcases SAM-Track's ability to take multiple modes of interactions as prompt. The user specified human and skateboard with click and brushstroke, respectively.  
-<div align=center>
- 
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348115/video_to_markdown/images/youtube--UFtwFaOfx2I-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=UFtwFaOfx2I&feature=youtu.be "demo1")
-</div>
+### 1. CPU Installation
 
-
-**Demo5** showcases SAM-Track's ability to refine the results of segment-everything. The user merges the tram as a whole with a single click.
-<div align=center>
- 
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348276/video_to_markdown/images/youtube--cK5MPFdJdSY-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=cK5MPFdJdSY&feature=youtu.be "demo1")
-</div>
-
-**Demo6** showcases SAM-Track's ability to add new objects during tracking. The user annotates another car by rolling back to an intermediate frame.
-<div align=center>
- 
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348411/video_to_markdown/images/youtube--l7hXM1a3nEA-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=l7hXM1a3nEA "demo1")
-</div>
-
-**Demo7** showcases SAM-Track's ability to refine the prediction during tracking. This feature is highly advantageous for segmentation and tracking under complex environments.
-<div align=center>
-
-[![demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1683348621/video_to_markdown/images/youtube--hPjw28Ul4cw-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=hPjw28Ul4cw&feature=youtu.be "demo1")
-</div>
-
-**Demo8** showcases SAM-Track's ability to interactively segment and track individual objects.  The user specified that SAM-Track tracked a man playing street basketball.
-<div align=center>
-
-[![Interactive Segment-and-Track-Anything Demo1](https://res.cloudinary.com/marcomontalbano/image/upload/v1681712022/video_to_markdown/images/youtube--Xyd54AngvV8-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=Xyd54AngvV8 "Interactive Segment-and-Track-Anything Demo1")
-</div>
-
-**Demo9** showcases SAM-Track's ability to interactively add specified objects for tracking.The user customized the addition of objects to be tracked on top of the segmentation of everything in the scene using SAM-Track.
-<div align=center>
- 
-[![Interactive Segment-and-Track-Anything Demo2](https://res.cloudinary.com/marcomontalbano/image/upload/v1681712071/video_to_markdown/images/youtube--eZrdna8JkoQ-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=eZrdna8JkoQ "Interactive Segment-and-Track-Anything Demo2")
-</div>
-
-## :computer:Getting Started
-### :bookmark_tabs:Requirements
-
-The [Segment-Anything](https://github.com/facebookresearch/segment-anything) repository has been cloned and renamed as sam, and the [aot-benchmark](https://github.com/yoxu515/aot-benchmark) repository has been cloned and renamed as aot.
-
-Please check the dependency requirements in [SAM](https://github.com/facebookresearch/segment-anything) and [DeAOT](https://github.com/yoxu515/aot-benchmark).
-
-The implementation is tested under python 3.9, as well as pytorch 1.10 and torchvision 0.11. **We recommend equivalent or higher pytorch version**.
-
-Use the `install.sh` to install the necessary libs for SAM-Track
-```
-bash script/install.sh
-```
-
-<<<<<<< HEAD
-=======
-### FFmpeg Requirement
-This project requires FFmpeg (used by MoviePy).
-
-Windows
-
-Download a **shared** FFmpeg build from:
-https://github.com/GyanD/codexffmpeg/releases
-
-Extract it, for example, to:
-```text
-C:\ffmpeg
-```
-Add the following directory to your `PATH`:
-```text
-C:\ffmpeg\bin
-```
-Open a new terminal and verify the installation:
+#### Step 1: Create and activate a virtual environment
 
 ```bash
-ffmpeg -version
+python -m venv venv
 ```
 
-#### Linux
+After creating, activate your virtual environment.
+
+#### Step 2: Install the dependencies
 
 ```bash
-sudo apt update
-sudo apt install ffmpeg
-
-ffmpeg -version
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
-#### macOS
+
+---
+
+### 2. GPU Installation — Docker
+
+Docker is the canonical GPU deployment method for this project.
+
+We provide a prebuilt GPU image through GitHub Container Registry (GHCR). The image includes the complete runtime, including:
+
+- PyTorch
+- Opencv
+- Gradio
+- Transformers
+
+#### Pull and Run the Prebuilt Image
+
+GPU users can pull and start the prebuilt image directly:
 
 ```bash
-brew install ffmpeg
-ffmpeg -version
+docker compose -f docker-compose.ghcr.yml up
 ```
 
->>>>>>> c4992261d0d1c6e0a6e3f2c0eec9e65c78474987
-### :star:Model Preparation
-Download SAM model to ckpt, the default model is SAM-VIT-B ([sam_vit_b_01ec64.pth](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth)).
+Docker Compose will pull the image from GHCR automatically if it is not already available locally.
 
-Download DeAOT/AOT model to ckpt, the default model is R50-DeAOT-L ([R50_DeAOTL_PRE_YTB_DAV.pth](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view)).
+#### Build from Source
 
-Download Grounding-Dino model to ckpt, the default model is GroundingDINO-T ([groundingdino_swint_ogc](https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth)).
+For development or when modifying the Docker image, you can build it locally:
 
-Download AST model to ast_master/pretrained_models, the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
-
-<<<<<<< HEAD
-You can download the default weights using the command line as shown below.
-```
-=======
-3. SAM vit_h: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
-
-**- Download DEAOT model to ckpt folder for running the code**
-
-| Model      | Param (M) |                                             PRE_YTB_DAV                                        |
-|:---------- |:---------:|:--------------------------------------------------------------------------------------------:  |
-| DeAOTT       |    7.2    | [gdrive](https://drive.google.com/file/d/1ThWIZQS03cYWx1EKNN8MIMnJS5eRowzr/view?usp=sharing) |
-| DeAOTS       |    10.2   | [gdrive](https://drive.google.com/file/d/1YwIAV5tBtn5spSFxKLBQBEQGwPHyQlHi/view?usp=sharing) |
-| DeAOTB       |    13.2   | [gdrive](https://drive.google.com/file/d/1BHxsonnvJXylqHlZ1zJHHc-ymKyq-CFf/view?usp=sharing) |
-| DeAOTL       |    13.2   | [gdrive](https://drive.google.com/file/d/18elNz_wi9JyVBcIUYKhRdL08MA-FqHD5/view?usp=sharing) |
-| R50-DeAOTL   |    19.8   | [gdrive](https://drive.google.com/file/d/1QoChMkTVxdYZ_eBlZhK2acq9KMQZccPJ/view?usp=sharing) |
-| SwinB-DeAOTL |    70.3   | [gdrive](https://drive.google.com/file/d/1g4E-F0RPOx9Nd6J7tU9AE1TjsouL4oZq/view?usp=sharing) |
-
-**Download Grounding-DINO model to ckpt folder**
-
-| Name | Backbone | Training Data | Box AP (COCO) | Checkpoint |
-|------|----------|---------------|---------------|------------|
-| GroundingDINO-T | Swin-T | O365, GoldG, Cap4M | 48.4 (zero-shot) / 57.2 (fine-tuned) | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth) |
-| GroundingDINO-B | Swin-B | COCO, O365, GoldG, Cap4M, OpenImages, ODinW-35, RefCOCO | 56.7 | [Download](https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha2/groundingdino_swinb_cogcoor.pth) |
-
-
-**Download AST model to /ckpt folder**
-
-1. [Full AudioSet, 10 tstride, 10 fstride, with Weight Averaging (0.459 mAP)](https://www.dropbox.com/s/ca0b1v2nlxzyeb4/audioset_10_10_0.4593.pth?dl=1)
-2. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 1 (0.450 mAP)](https://www.dropbox.com/s/1tv0hovue1bxupk/audioset_10_10_0.4495.pth?dl=1)
-3. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 2  (0.448 mAP)](https://www.dropbox.com/s/6u5sikl4b9wo4u5/audioset_10_10_0.4483.pth?dl=1)
-4. [Full AudioSet, 10 tstride, 10 fstride, without Weight Averaging, Model 3  (0.448 mAP)](https://www.dropbox.com/s/kt6i0v9fvfm1mbq/audioset_10_10_0.4475.pth?dl=1)
-5. [Full AudioSet, 12 tstride, 12 fstride, without Weight Averaging, Model (0.447 mAP)](https://www.dropbox.com/s/snfhx3tizr4nuc8/audioset_12_12_0.4467.pth?dl=1)
-6. [Full AudioSet, 14 tstride, 14 fstride, without Weight Averaging, Model (0.443 mAP)](https://www.dropbox.com/s/z18s6pemtnxm4k7/audioset_14_14_0.4431.pth?dl=1)
-7. [Full AudioSet, 16 tstride, 16 fstride, without Weight Averaging, Model (0.442 mAP)](https://www.dropbox.com/s/mdsa4t1xmcimia6/audioset_16_16_0.4422.pth?dl=1)
-
-8. [Speechcommands V2-35, 10 tstride, 10 fstride, without Weight Averaging, Model (98.12% accuracy on evaluation set)](https://www.dropbox.com/s/q0tbqpwv44pquwy/speechcommands_10_10_0.9812.pth?dl=1)
- the default model is audioset_0.4593 ([audioset_0.4593.pth]( https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)).
-
-You can download the **default weights** using the command line as shown below.
-$$
->>>>>>> c4992261d0d1c6e0a6e3f2c0eec9e65c78474987
-bash script/download_ckpt.sh
+```bash
+docker compose up --build
 ```
 
-### :heart:Run Demo
-- The video to be processed can be put in ./assets. 
-- Then run **demo.ipynb** step by step to generate results. 
-- The results will be saved as masks for each frame and a gif file for visualization.
+---
 
-The arguments for SAM-Track, DeAOT and SAM can be manually modified in model_args.py for purpose of using other models or controling the behavior of each model.
+## Running Segment-and-Track-Anything
 
-### :muscle:WebUI App
-Our user-friendly visual interface allows you to easily obtain the results of your experiments. Simply initiate it using the command line.
+### Native CPU Inference
 
+* **Gradio Interface:**
+
+  ```bash
+  python app.py
+  ```
+
+### Docker GPU Inference
+
+The Docker Compose configuration starts using the containerized application stack.
+
+To stop the containers:
+
+```bash
+docker compose down
 ```
-python app.py
-```
-Users can upload the video directly on the UI and use SegTracker to automatically/interactively track objects within that video. We use a video of a man playing basketball as an example.
 
-![Interactive WebUI](./assets/interactive_webui.jpg)
+---
 
-SegTracker-Parameters:
- - **aot_model**: used to select which version of DeAOT/AOT to use for tracking and propagation.
- - **sam_gap**: used to control how often SAM is used to add newly appearing objects at specified frame intervals. Increase to decrease the frequency of discovering new targets, but significantly improve speed of inference.
- - **points_per_side**: used to control the number of points per side used for generating masks by sampling a grid over the image. Increasing the size enhances the ability to detect small objects, but larger targets may be segmented into finer granularity.
- - **max_obj_num**: used to limit the maximum number of objects that SAM-Track can detect and track. A larger number of objects necessitates a greater utilization of memory, with approximately 16GB of memory capable of processing a maximum of 255 objects.
+## Credits
 
-Usage: To see the details, please refer to the [tutorial for 1.0-Version WebUI](./tutorial/tutorial%20for%20WebUI-1.0-Version.md).
+This project builds upon the work of the authors of **Segment and Track Anything (SAM-Track)**, developed under the **ReLER Lab at Zhejiang University’s College of Computer Science and Technology**.
 
-### :school:About us
-Thank you for your interest in this project. The project is supervised by the ReLER Lab at Zhejiang University’s College of Computer Science and Technology. ReLER was established by Yang Yi, a Qiu Shi Distinguished Professor at Zhejiang University. Our dedicated team of contributors includes [Yangming Cheng](https://github.com/yamy-cheng), Jiyuan Hu, [Yuanyou Xu](https://github.com/yoxu515), [Liulei Li](https://github.com/lingorX), [Xiaodi Li](https://github.com/LiNO3Dy), [Zongxin Yang](https://z-x-yang.github.io/), [Wenguan Wang](https://sites.google.com/view/wenguanwang) and [Yi Yang](https://scholar.google.com/citations?user=RMSuNFwAAAAJ&hl=en).
+We gratefully acknowledge the contributions of:
 
-### :full_moon_with_face:Credits
-Licenses for borrowed code can be found in [licenses.md](https://github.com/z-x-yang/Segment-and-Track-Anything/blob/main/licenses.md) file. 
+**Yangming Cheng, Liulei Li, Yuanyou Xu, Xiaodi Li, Zongxin Yang, Wenguan Wang, and Yi Yang.**
 
-* DeAOT/AOT - [https://github.com/yoxu515/aot-benchmark](https://github.com/yoxu515/aot-benchmark)
-* SAM - [https://github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything)
-* Gradio (for building WebUI) - [https://github.com/gradio-app/gradio](https://github.com/gradio-app/gradio)
-* Grounding-Dino - [https://github.com/yamy-cheng/GroundingDINO](https://github.com/yamy-cheng/GroundingDINO)
-* AST - [https://github.com/YuanGongND/ast](https://github.com/YuanGongND/ast)
+For the original research and implementation, please refer to:
 
-### License
-The project is licensed under the [AGPL-3.0 license](https://github.com/z-x-yang/Segment-and-Track-Anything/blob/main/LICENSE.txt). To utilize or further develop this project for commercial purposes through proprietary means, permission must be granted by us (as well as the owners of any borrowed code).
+- **Paper:** *Segment and Track Anything*, Cheng et al., 2023
+- **arXiv:** [arXiv:2305.06558](https://arxiv.org/abs/2305.06558)
+- **Original repository:** [Segment and Track Anything](https://github.com/z-x-yang/Segment-and-Track-Anything)
 
-### Citations
-Please consider citing the related paper(s) in your publications if it helps your research.
-```
+The original work was supervised by **Yi Yang**, Qiu Shi Distinguished Professor at Zhejiang University, through the ReLER Lab.
+
+--
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+See the [`LICENSE`](LICENSE) file for the full license text.
+
+This project is a modified and refactored version of **Segment and Track Anything (SAM-Track)** and retains the original project's AGPL-3.0 licensing terms.
+
+---
+
+## Citation
+
+If you use this project, please cite the original **Segment and Track Anything**
+work on which this project is based:
+
+```bibtex
 @article{cheng2023segment,
   title={Segment and Track Anything},
   author={Cheng, Yangming and Li, Liulei and Xu, Yuanyou and Li, Xiaodi and Yang, Zongxin and Wang, Wenguan and Yang, Yi},
   journal={arXiv preprint arXiv:2305.06558},
   year={2023}
 }
-@article{kirillov2023segment,
-  title={Segment anything},
-  author={Kirillov, Alexander and Mintun, Eric and Ravi, Nikhila and Mao, Hanzi and Rolland, Chloe and Gustafson, Laura and Xiao, Tete and Whitehead, Spencer and Berg, Alexander C and Lo, Wan-Yen and others},
-  journal={arXiv preprint arXiv:2304.02643},
-  year={2023}
-}
-@inproceedings{yang2022deaot,
-  title={Decoupling Features in Hierarchical Propagation for Video Object Segmentation},
-  author={Yang, Zongxin and Yang, Yi},
-  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
-  year={2022}
-}
-@inproceedings{yang2021aot,
-  title={Associating Objects with Transformers for Video Object Segmentation},
-  author={Yang, Zongxin and Wei, Yunchao and Yang, Yi},
-  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
-  year={2021}
-}
-@article{yang2024scalable,
-  title={Scalable video object segmentation with identification mechanism},
-  author={Yang, Zongxin and Miao, Jiaxu and Wei, Yunchao and Wang, Wenguan and Wang, Xiaohan and Yang, Yi},
-  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
-  volume={46},
-  number={9},
-  pages={6247--6262},
-  year={2024},
-  publisher={IEEE}
-}
-@article{liu2023grounding,
-  title={Grounding dino: Marrying dino with grounded pre-training for open-set object detection},
-  author={Liu, Shilong and Zeng, Zhaoyang and Ren, Tianhe and Li, Feng and Zhang, Hao and Yang, Jie and Li, Chunyuan and Yang, Jianwei and Su, Hang and Zhu, Jun and others},
-  journal={arXiv preprint arXiv:2303.05499},
-  year={2023}
-}
-@inproceedings{gong21b_interspeech,
-  author={Yuan Gong and Yu-An Chung and James Glass},
-  title={AST: Audio Spectrogram Transformer},
-  booktitle={Proc. Interspeech 2021},
-  pages={571--575},
-  doi={10.21437/Interspeech.2021-698}
-  year={2021} 
-}
-```
