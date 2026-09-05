@@ -13,60 +13,43 @@ This project is a substantially refactored implementation of the original SAM-Tr
 
 ## What Changed
 
-Legacy `SegTracker` vs modern refactored `Pipeline`
+### Legacy `SegTracker` vs modern refactored `Pipeline`
 
+| Dimension | `SegTracker` (legacy) | `Pipeline` (refactored) |
+|---|---|---|
+| **SAM / Grounding-DINO** | Vendored in-repo (`sys.path.append("./sam")`, `from sam.segment_anything import ...`, `from tool.detector import Detector`) — two full external repos cloned into the project | Delegated to Hugging Face inference via thin `inference.sam_segmentor` / `inference.dino_detector` HF wrappers — no vendored clones |
+| **"Segment everything"** | `seg()` calls `SAM.everything_generator.generate(frame)` — segments the *entire* frame every `sam_gap` frames (default gap = 100 frames, max_obj = 255 ~3.33s @30fps), then discards most of it via `min_area`/`max_obj_num` filtering | Removed entirely. No automatic mask generator anywhere. Only bounded, user-driven mask creation remains: `seg_acc_click` (point prompts) and `detect_and_seg` (Grounding-DINO boxes) |
+| **Why remove it** | Segment-everything routinely proposes far more regions than can ever be tracked | DeAOT hard-caps at ~10 tracked objects by design — an unbounded whole-frame segmentation that gets immediately truncated to 10 objects is wasted GPU work on every `sam_gap` boundary |
+| **GC / CUDA cache calls** | `gc.collect()` + `torch.cuda.empty_cache()` called in pairs, *inside the per-frame loop*: 1 pair unconditionally every frame, +1 extra pair on frame 0, +1 extra pair every `sam_gap`-th frame | Zero occurrences in the class. No cache-thrash pattern in the orchestration layer at all |
+| **Cost of that pattern** | ≈2 calls/frame baseline, spiking to 4 on frame 0 and every `sam_gap`-th frame — for a 1,000-frame clip that's on the order of 1,000+ full GC passes plus 1,000+ CUDA allocator flushes | N/A — device/memory concerns pushed down into the tracker module instead of scattered through the video loop |
+| **Model loading** | Models are initialized eagerly through `SegTracker` setup, loading all components regardless of usage | Models are loaded lazily by their respective inference modules only when first requested |
+| **Device support** | `DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")` — binary CUDA/CPU only; `autocast` only enabled under CUDA → no Apple Silicon acceleration path | Device selection and autocast live in `deaot_tracker.Tracker`, which is CUDA/MPS-aware — `Pipeline` itself is hardware-agnostic |
+| **Video decode passes** | **Two** full decodes of the same input: pass 1 runs inference and builds `pred_list`; pass 2 *reopens* `cv2.VideoCapture(input_video)` purely to render masks | **One** decode. `track_video_sequence` is a single generator, rendering and `yield`-ing `(masked_frame, frame_idx)` inline in the same pass as inference |
+| **DeAOT codebase** | Full AOT benchmark repository with generic training infrastructure and unused components — 30+ files carried into the project | Stripped down to the single supported DeAOT inference path, retaining only required code — approximately 10 files remain |
+| **Output artifacts** | Mask PNGs per frame, masked-frame PNGs per frame, output `.mp4`, output `.gif`, **and** a `.zip` of all mask PNGs — all five written unconditionally to disk | None written by the class itself — it yields frames; the Gradio caller owns persistence |
+| **Inference time** | ~100 seconds to process a 3-second video on CPU | ~20 seconds to process the same 3-second video on CPU (~5× faster CPU inference) |
+| **Video vs. image-sequence input** | Two ~100-line, near-duplicate methods reimplementing the entire pipeline twice, differing only in frame sourcing | One `_get_frame_source` generator handling both video (`cv2.VideoCapture`) and zip-based image sequences behind a single interface |
+| **Object/id bookkeeping** | `reference_objs_list` + `get_tracking_objs()`/`get_obj_num()` re-derive object count by scanning full history on every call | `current_mask` is the explicit single source of truth; `curr_idx` is kept consistent via `max(self.curr_idx, obj_num + 1)` |
+| **Cancellation** | None — a run goes to completion or crashes | `threading.Event`-backed `stop_tracking()` checked inside the frame generator |
+| **Input validation** | None — assumes well-formed masks/frames throughout | Explicit guards (`ValueError`/`RuntimeError` with messages) on `None` masks, wrong `ndim`, and uninitialized trackers |
+| **Progress reporting** | Inline `print(..., end='\r')` statements mixed into core logic | No progress logic in pipeline — exposed through per-frame `yield` |
+| **Dead code** | Large commented-out blocks left in place | None |
+| **Method naming** | Instance methods take `SegTracker` as their first parameter name instead of `self` | Consistent `self`, methods grouped under clear section-comment headers |
 
-\| Dimension | \`SegTracker\` (legacy) | \`Pipeline\` (refactored) |
+---
 
-\|---|---|---|
+### Legacy Dockerfile vs Modern Refactored Dockerfile
 
-\| **\*\*SAM / Grounding-DINO\*\*** | Vendored in-repo (\`sys.path.append("./sam")\`, \`from sam.segment\_anything import ...\`, \`from tool.detector import Detector\`) — two full external repos cloned into the project | Delegated to Hugging Face inference via a thin \`inference.sam\_segmentor\` / \`inference.dino\_detector\` HF wrappers — no vendored clones. |
+| Dimension | `Dockerfile` (legacy) | `Dockerfile` (refactored) |
+|---|---|---|
+| **Container base & CUDA stack** | `pytorch/pytorch:2.0.1-cuda11.8-cudnn8-devel` — PyTorch 2.0.1, CUDA 11.8, cuDNN 8, heavyweight development image | `pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime` — PyTorch 2.13.0, CUDA 13.2, cuDNN 9, lightweight runtime image |
+| **System dependencies & build toolchain** | Explicitly installs `build-essential`, `cmake`, `git`, `ffmpeg`, `wget`, `curl`, `python3-dev`, and manually sets `CUDA_HOME` | No explicit apt toolchain; relies on runtime base image and Python dependencies declared in `requirements.txt` |
+| **Python dependency management** | Large inline `pip install` block with ~20 tightly pinned packages, followed by separate editable installs for `sam` and GroundingDINO | Dependencies centralized in `requirements.txt` focusing on `opencv-python-headless`, `gradio`, and Hugging Face `transformers` |
+| **Build efficiency & image footprint** | `COPY . .` occurs before dependency installation; installs dev tooling; pip caching not explicitly disabled | Copies `requirements.txt` first, installs with `--no-cache-dir`, then copies application source; `PIP_NO_CACHE_DIR=1` enabled globally |
 
-\| **\*\*"Segment everything"\*\*** | \`seg()\` calls \`SAM.everything\_generator.generate(frame)\` — segments the *\*entire\** frame (sky, ground, water, debris, everything) every \`sam\_gap\` frames (default gap = 100 frames, max_obj = 255 \~3.33s @30fps), then discards most of it via \`min\_area\`/\`max\_obj\_num\` filtering | Removed entirely. No automatic mask generator anywhere. Only bounded, user-driven mask creation remains: \`seg\_acc\_click\` (point prompts) and \`detect\_and\_seg\` (Grounding-DINO boxes) |
+---
 
-\| **\*\*Why remove it\*\*** | Segment-everything routinely proposes far more regions than can ever be tracked | DeAOT hard-caps at \~10 tracked objects by design — an unbounded whole-frame segmentation that gets immediately truncated to 10 objects is wasted GPU work on every \`sam\_gap\` boundary |
-
-\| **\*\*GC / CUDA cache calls\*\*** | \`gc.collect()\` + \`torch.cuda.empty\_cache()\` called in pairs, *\*inside the per-frame loop\**: 1 pair unconditionally every frame, +1 extra pair on frame 0, +1 extra pair every \`sam\_gap\`-th frame (both \`video\_type\_input\_tracking\` and its near-duplicate \`img\_seq\_type\_input\_tracking\`) | Zero occurrences in the class. No cache-thrash pattern in the orchestration layer at all |
-
-\| **\*\*Cost of that pattern\*\*** | ≈2 calls/frame baseline, spiking to 4 on frame 0 and every \`sam\_gap\`-th frame — for a 1,000-frame clip that's on the order of 1,000+ full GC passes plus 1,000+ CUDA allocator flushes, most of them on frames where nothing was even allocated | N/A — device/memory concerns pushed down into the tracker module instead of scattered through the video loop |
-
-| **\*\*\*\*Model loading\*\*\*\*** | Models are initialized eagerly through `SegTracker` setup, loading the segmentation, detection, and tracking components regardless of which functionality is actually used | Models are loaded lazily by their respective inference modules, initializing a model only when that capability is first requested | **\*\*\*\*Lazy model initialization:\*\*\*\*** avoids loading unused models at startup, reducing initial memory usage and startup time |
-
-\| **\*\*Device support\*\*** | \`DEVICE = torch.device("cuda" if torch.cuda.is\_available() else "cpu")\` — binary CUDA/CPU only; \`autocast\` only enabled under CUDA (\`nullcontext\` otherwise) → no Apple Silicon acceleration path | Device selection and autocast live in \`deaot\_tracker.Tracker\`, which is CUDA/MPS-aware — \`Pipeline\` itself is hardware-agnostic |
-
-\| **\*\*Video decode passes\*\*** | **\*\*Two\*\*** full decodes of the same input: pass 1 runs inference and builds \`pred\_list\`; pass 2 *\*reopens\** \`cv2.VideoCapture(input\_video)\` from frame 0 purely to render masks, write per-frame PNGs, build the output video, and build the gif frame list | **\*\*One\*\*** decode. \`track\_video\_sequence\` is a single generator over \`\_get\_frame\_source\`, rendering and \`yield\`-ing \`(masked\_frame, frame\_idx)\` inline, in the same pass as inference |
-
-| **\*\*\*\*DeAOT codebase\*\*\*\*** | Full AOT benchmark repository with generic training infrastructure, multiple model variants, training utilities, configs, datasets, and other unused components — 30+ files carried into the project | Stripped down to the single supported DeAOT inference path, with the generic training infrastructure and unused model variants removed — approximately 10 files remain | **\*\*\*\*Inference-only model stack:\*\*\*\*** removes the generic training/benchmark infrastructure and retains only the code required to run the selected DeAOT tracker |
-
-\| **\*\*Output artifacts\*\*** | Mask PNGs per frame, masked-frame PNGs per frame, output \`.mp4\`, output \`.gif\` (via \`imageio\`), **\*\*and\*\*** a \`.zip\` of all mask PNGs — all five written unconditionally to disk | None written by the class itself — it yields frames; the Gradio caller owns persistence, so nothing is duplicated or silently overwritten by a second run |
-
-| **\*\*\*\*Inference time\*\*\*\*** | ~100 seconds to process a 3-second video on CPU | ~20 seconds to process the same 3-second video on CPU | **\*\*\*\*~5× faster CPU inference:\*\*\*\*** measured on the same 3-second video, reducing inference time from ~100s to ~20s |
-
-\| **\*\*Video vs. image-sequence input\*\*** | Two \~100-line, near-duplicate methods (\`video\_type\_input\_tracking\`, \`img\_seq\_type\_input\_tracking\`) reimplementing the entire pipeline twice, differing only in how frames are sourced | One \`\_get\_frame\_source\` contextmanager/generator handling both video (\`cv2.VideoCapture\`) and zip-based image sequences (extracted to an auto-cleaned \`tempfile.TemporaryDirectory\`) behind a single interface consumed once by \`track\_video\_sequence\` |
-
-\| **\*\*Object/id bookkeeping\*\*** | \`reference\_objs\_list\` (a running list of per-frame \`np.unique\` arrays) + \`get\_tracking\_objs()\`/\`get\_obj\_num()\` re-derive object count by scanning that whole history on every call | \`current\_mask\` is the explicit single source of truth; \`curr\_idx\` is kept consistent via \`max(self.curr\_idx, obj\_num + 1)\` at every mutation point — no historical list to replay |
-
-\| **\*\*Cancellation\*\*** | None — a run goes to completion or crashes | \`threading.Event\`-backed \`stop\_tracking()\` checked inside the frame generator, so a long-running stream can be interrupted mid-video (useful behind an interactive frontend) |
-
-\| **\*\*Input validation\*\*** | None — assumes well-formed masks/frames throughout | Explicit guards (\`ValueError\`/\`RuntimeError\` with messages) on \`None\` masks, wrong \`ndim\`, and using the tracker before initialization |
-
-\| **\*\*Progress reporting\*\*** | Inline \`print(..., end='\r')\` statements mixed into core logic | No progress logic in the pipeline — progress is exposed through the per-frame `yield`, leaving presentation entirely to the caller |
-
-\| **\*\*Dead code\*\*** | Large commented-out blocks left in place (alternate \`fourcc\` codecs, legacy \`i\_frame\_num\` skip-logic) | None |
-
-\| **\*\*Method naming\*\*** | Instance methods on \`video\_type\_input\_tracking\`/\`img\_seq\_type\_input\_tracking\` take \`SegTracker\` as their first parameter name instead of \`self\` — confusingly shadows the class name itself | Consistent \`self\`, methods grouped under clear section-comment headers (State / Object bookkeeping / DeAOT reference-tracking / Rendering / Interactive segmentation / Detection+segmentation / Video generator / Frame source) |
-
-Legacy `Dockerfile` vs modern refactored `Dockerfile`
-
-\| Dimension | \`DockerFile\` (legacy) | \`DockerFile\` (refactored) |
-
-\|---|---|---|
-| ****Container base & CUDA stack**** | `pytorch/pytorch:2.0.1-cuda11.8-cudnn8-devel` — PyTorch 2.0.1, CUDA 11.8, cuDNN 8, heavyweight development image | `pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime` — PyTorch 2.13.0, CUDA 13.2, cuDNN 9, lightweight runtime image | modernized stack: PyTorch **2.0.1 → 2.13.0**, CUDA **11.8 → 13.2**, cuDNN **8 → 9**, and `devel → runtime` |
-| ****System dependencies & build toolchain**** | Explicitly installs `build-essential`, `cmake`, `git`, `ffmpeg`, `wget`, `curl`, `python3-dev`, etc., and manually sets `CUDA_HOME` | No explicit apt toolchain; relies on the runtime base image and Python dependencies declared in `requirements.txt` | Removes unnecessary build-time/system baggage from the application image, producing a significantly cleaner deployment container |
-| ****Python dependency management**** | Large inline `pip install` block with ~20 tightly pinned packages, followed by separate editable installs for `sam` and a Git-cloned GroundingDINO repository | Dependencies centralized in `requirements.txt`, currently focused on `opencv-python-headless`, `gradio`, and Hugging Face `transformers` | modern dependency layout: Dockerfile describes **how to build**, while `requirements.txt` describes **what the application needs**; no runtime repository cloning or duplicated dependency declarations |
-| ****Build efficiency & image footprint**** | `COPY . .` occurs before dependency installation; installs development tooling and editable native projects; pip caching is not explicitly disabled | Copies `requirements.txt` first, installs with `--no-cache-dir`, then copies the application source; `PIP_NO_CACHE_DIR=1` is enabled globally | Modern Docker layering gives better dependency-layer caching, avoids pip cache bloat, removes unnecessary compiler/toolchain overhead, and produces a substantially leaner inference image |
-
-Legacy Gradio Frontend vs modern refactored Gradio Frontend
+### Legacy Gradio Frontend vs modern refactored Gradio Frontend
 
 | Dimension | Legacy `app.py` (Gradio 3.39) | Refactored `application.py` (Gradio 6.x) |
 |---|---|---|
