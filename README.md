@@ -82,7 +82,7 @@ SAM-Track is split into two independent layers: a Gradio frontend that owns noth
 
 **Frontend.** The UI collects two kinds of input — point clicks and text prompts — and batches them before anything gets sent to the backend. Clicks for one object accumulate locally; an explicit "add object" action closes that group and starts the next one, so an arbitrary number of objects can be prompted before a single request goes out. Session state (accumulated prompts, the current tracker instance, the in-progress output file) lives entirely in Gradio's own state components, and tracking output is written to a session-scoped temp file that gets cleaned up on reset instead of accumulating on disk.
 
-**Backend.** `Pipeline` wraps three components — a segmentor, a detector, and a tracker — behind one interface. Segmentation (SAM) and text-grounded detection (Grounding-DINO) are both delegated to hugging face, so the app never has to load or manage those models locally. Tracking (DeAOT) is the one model that actually runs on-device, with the CUDA/MPS/CPU selection handled entirely inside the tracker module — `Pipeline` itself is hardware-agnostic. A single frame-source abstraction handles both video files and zipped image sequences behind one generator, so the rest of the pipeline doesn't need to know which kind of input it's looking at.
+**Backend.** `Pipeline` wraps three components — a segmentor, a detector, and a tracker — behind one interface. Segmentation (SAM) and text-grounded detection (Grounding-DINO) are both delegated to Hugging Face inference wrappers, so the app never has to load or manage those models locally. Tracking (DeAOT) is the one model that actually runs on-device, with the CUDA/MPS/CPU selection handled entirely inside the tracker module — `Pipeline` itself is hardware-agnostic. A single frame-source abstraction handles both video files and zipped image sequences behind one generator, so the rest of the pipeline doesn't need to know which kind of input it's looking at.
 
 **Data flow.** A batched click or text prompt produces one mask from the segmentor/detector; the pipeline diffs that mask against whatever's already tracked and commits only the genuinely new object ids to the tracker's reference set. Once tracking starts, `Pipeline` yields one rendered frame at a time from a single decode pass — the frontend writes each frame to the output video as it arrives and mirrors it to a live preview, so the UI shows progress instead of blocking until the whole clip is done. Tracking can be paused mid-stream to add a newly-appeared object, then resumed, without restarting or rewinding.
 
@@ -132,12 +132,12 @@ python -m pip install -r requirements.txt
 
 ### 2. GPU Installation — Docker
 
-Docker is the canonical GPU deployment method for this project.
+Docker is the canonical GPU deployment method for this project, GPU users need not install any Python dependencies manually.
 
 We provide a prebuilt GPU image through GitHub Container Registry (GHCR). The image includes the complete runtime, including:
 
 - PyTorch
-- Opencv
+- OpenCV
 - Gradio
 - Transformers
 
@@ -168,12 +168,12 @@ docker compose up --build
 * **Gradio Interface:**
 
   ```bash
-  python app.py
+  python application.py
   ```
 
 ### Docker GPU Inference
 
-The Docker Compose configuration starts using the containerized application stack.
+The Docker Compose configuration starts the containerized application stack.
 
 To stop the containers:
 
