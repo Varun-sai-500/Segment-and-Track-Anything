@@ -1,15 +1,19 @@
 # Segment and Track Anything
 
-> A modernized, lightweight refactor of **Segment and Track Anything (SAM-Track)**.
-> Engineered for high-accuracy, non-real-time mask propagation — built on clean and modern PyTorch and Hugging Face backends with zero legacy dependency debt.
+> A modernized, lightweight refactor of Segment and Track Anything (SAM-Track) — the framework adopted as core vision infrastructure by MIT CSAIL & Harvard SEAS in [*Follow Anything*](https://github.com/alaamaalouf/FollowAnything) (IEEE RA-L). 
+> Re-engineered for high-accuracy mask propagation with unified PyTorch and Hugging Face backends, zero legacy baggage, and rock-solid maintainability.
 
-## Introduction
+## Overview
 
-**Segment-and-Track-Anything** is a video segmentation and tracking framework designed to segment and track objects throughout a video. It brings together interactive and automatic methods for selecting objects of interest and maintaining their segmentation across frames.
+**Segment-and-Track-Anything** unifies image-level segmentation with temporal mask propagation to track arbitrary visual targets across video streams. It couples **Segment Anything (SAM)** for zero-shot promptable mask generation, **Grounding-DINO** for open-vocabulary text detection, and **DeAOT** for multi-object temporal propagation.
 
-The project is built around the idea of combining powerful image-level segmentation with dedicated video tracking. The original Segment and Track Anything (SAM-Track) framework combines the Segment Anything Model (SAM) for obtaining object masks on reference frames with DeAOT, an AOT-based video object tracking model, to propagate those masks across subsequent frames. It also integrates Grounding-DINO to enable text-guided object selection.
+While the original architecture validated the mathematical feasibility of this pipeline, its reference implementation suffered from severe prototype debt: unconstrained per-frame memory allocation, redundant multi-pass video decodes, and brittle submodule coupling.
 
-This project is a substantially refactored implementation of the original SAM-Track software. The underlying segmentation and tracking approach is preserved, while the application and inference stack have been redesigned around modern model backends, explicit object state, streaming execution, and a substantially smaller dependency and model footprint.
+This project delivers a high-throughput, deployment-grade project designed around streaming execution, bounded memory lifecycles, and a minimal, modern inference stack.
+
+<p align="center">
+  <img src="assets/demo.gif" width="100%">
+</p>
 
 ## What Changed
 
