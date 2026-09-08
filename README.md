@@ -13,9 +13,16 @@ This project delivers a high-throughput, deployment-grade project designed aroun
 
 <p align="center">
   <img src="assets/demo.gif" width="100%">
+  <br>
+  <em>Multi-object tracking with mid-stream dynamic insertion of new targets.</em>
 </p>
 
+
 ## What Changed
+
+The original reference implementation coupled novel research models with significant prototype debt—redundant I/O passes, per-frame allocator thrashing, and fragile submodule dependencies. 
+
+The refactored `Pipeline` re-architects the orchestration layer around streaming generators, deterministic memory lifecycles, and modern model backends, yielding a **~5x end-to-end latency reduction** while preserving full tracking fidelity.
 
 ### Legacy `SegTracker` vs modern refactored `Pipeline`
 
@@ -111,7 +118,9 @@ Segment-and-Track-Anything supports two deployment paths:
 | **CPU** | Native Python installation |
 | **NVIDIA GPU** | Docker with the prebuilt GHCR image |
 
-> **Note:** The prebuilt Docker image is canonical GPU deployment. GPU users need not install any python dependencies manually.
+> **Note:** The prebuilt Docker image is canonical GPU deployment. GPU users need not install any python dependencies manually
+
+ > **Zero-Friction Weight Management:** All model checkpoints (SAM, Grounding-DINO, and R50-DeAOT-L) are automatically fetched from Hugging Face Hub on first run. No manual `.pth` downloads or local path wrangling required.
 
 ---
 
@@ -203,7 +212,7 @@ For the original research and implementation, please refer to:
 
 The original work was supervised by **Yi Yang**, Qiu Shi Distinguished Professor at Zhejiang University, through the ReLER Lab.
 
---
+---
 
 ## License
 
