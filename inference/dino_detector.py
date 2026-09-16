@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from contextlib import nullcontext
 from transformers import (
@@ -67,8 +66,6 @@ class Detector:
         box_threshold=0.35,
         text_threshold=0.25,
     ):
-        frame = np.asarray(origin_frame)
-
         self._load_model()
 
         grounding_caption = self.normalize_caption(
@@ -76,7 +73,7 @@ class Detector:
         )
 
         inputs = self.processor(
-            images=frame,
+            images=origin_frame,
             text=grounding_caption,
             return_tensors="pt",
         ).to(self.device)
@@ -91,7 +88,7 @@ class Detector:
                 inputs.input_ids,
                 threshold=box_threshold,
                 text_threshold=text_threshold,
-                target_sizes=[frame.shape[:2]],
+                target_sizes=[origin_frame.shape[:2]],
             )[0]
         )
 
