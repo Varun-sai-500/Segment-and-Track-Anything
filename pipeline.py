@@ -4,21 +4,24 @@ import zipfile
 import cv2
 import numpy as np
 import threading
+import torch
 from contextlib import contextmanager
 
 from inference.sam_segmentor import Segmentor
 from inference.dino_detector import Detector
 from inference.deaot_tracker import Tracker
-from mask_utils import draw_outline, draw_mask
+from mask_utils import draw_mask
 
 
 class Pipeline:
     def __init__(self, sam_args, dino_args, deaot_args):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         self.segmentor = Segmentor(sam_args)
         self.tracker = Tracker(deaot_args)
         self.detector = Detector(dino_args)
 
-        # Single source of truth for the current labeled mask.
+        # Single source of truth for the current labeled mask. Now strictly a Torch Tensor.
         self.current_mask = None
 
         # Next object ID assigned to a newly segmented object.
@@ -26,7 +29,7 @@ class Pipeline:
 
         self._stop_event = threading.Event()
 
-        print("Pipeline initialized successfully.")
+        print(f"Pipeline initialized successfully on {self.device}.")
 
     # ------------------------------------------------------------------
     # State
@@ -38,44 +41,42 @@ class Pipeline:
     def get_current_mask(self):
         if self.current_mask is None:
             return None
-
-        return self.current_mask.copy()
+        return self.current_mask.clone()
 
     def set_current_mask(self, mask):
         if mask is None:
             self.current_mask = None
             return
 
-        mask = np.asarray(mask)
+        # Ensure it's a tensor on the correct device
+        if not isinstance(mask, torch.Tensor):
+            mask = torch.tensor(mask, device=self.device, dtype=torch.uint8)
+        else:
+            mask = mask.to(self.device, dtype=torch.uint8)
 
         if mask.ndim != 2:
             raise ValueError("Current mask must be a 2D label mask.")
 
-        self.current_mask = mask.copy()
+        self.current_mask = mask.clone()
         obj_num = self.get_obj_num()
-
         self.curr_idx = max(self.curr_idx, obj_num + 1)
 
     # ------------------------------------------------------------------
-    # Object bookkeeping
+    # Object bookkeeping 
     # ------------------------------------------------------------------
 
     def get_tracking_objs(self):
         if self.current_mask is None:
             return []
-
-        objs = np.unique(self.current_mask)
+        
+        objs = torch.unique(self.current_mask)
         objs = objs[objs != 0]
-
         return objs.tolist()
 
     def get_obj_num(self):
-        objs = self.get_tracking_objs()
-
-        if not objs:
+        if self.current_mask is None:
             return 0
-
-        return int(max(objs))
+        return int(torch.max(self.current_mask).item())
 
     # ------------------------------------------------------------------
     # DeAOT reference / tracking
@@ -85,12 +86,13 @@ class Pipeline:
         if mask is None:
             raise ValueError("Cannot initialize tracker without a mask.")
 
-        mask = np.asarray(mask)
+        if not isinstance(mask, torch.Tensor):
+            mask = torch.tensor(mask, device=self.device, dtype=torch.uint8)
 
         if mask.ndim != 2:
             raise ValueError("Reference mask must be a 2D label mask.")
 
-        obj_num = int(mask.max())
+        obj_num = int(torch.max(mask).item())
 
         self.tracker.initialize(
             frame,
@@ -99,23 +101,22 @@ class Pipeline:
             frame_step=frame_step,
         )
 
-        self.current_mask = mask.copy()
+        self.current_mask = mask.clone()
         self.curr_idx = max(self.curr_idx, obj_num + 1)
 
     def add_objects(self, mask, frame_step=0):
         if mask is None:
             raise ValueError("Cannot add objects without a mask.")
 
-        mask = np.asarray(mask)
-
         if self.current_mask is None:
-            raise RuntimeError(
-                "Cannot add objects before the tracker is initialized."
-            )
+            raise RuntimeError("Cannot add objects before the tracker is initialized.")
 
-        new_obj_num = int(max(self.current_mask.max(), mask.max()))
+        if not isinstance(mask, torch.Tensor):
+            mask = torch.tensor(mask, device=self.device, dtype=torch.uint8)
 
-        merged_mask = self.current_mask.copy()
+        new_obj_num = int(max(torch.max(self.current_mask).item(), torch.max(mask).item()))
+
+        merged_mask = self.current_mask.clone()
         new_pixels = mask > 0
         merged_mask[new_pixels] = mask[new_pixels]
 
@@ -124,28 +125,26 @@ class Pipeline:
         self.current_mask = merged_mask
         self.curr_idx = max(self.curr_idx, new_obj_num + 1)
 
-    def _mask_to_numpy(self, mask):
-        return mask.squeeze(0).squeeze(0).detach().cpu().numpy().astype(np.uint8)
+    # Use this fast tensor formatting instead
+    def _format_pred_mask(self, mask):
+        return mask.squeeze(0).squeeze(0).to(torch.uint8)
 
     def track(self, frame):
         pred_mask = self.tracker.track(frame)
-        mask_np = self._mask_to_numpy(pred_mask)
-        self.current_mask = mask_np
-
-        return mask_np
+        self.current_mask = self._format_pred_mask(pred_mask)
+        return self.current_mask
 
     def track_and_update(self, frame):
         pred_mask = self.tracker.track_and_update(frame)
-        mask_np = self._mask_to_numpy(pred_mask)
-        self.current_mask = mask_np
-
-        return mask_np
+        self.current_mask = self._format_pred_mask(pred_mask)
+        return self.current_mask
 
     def update_memory(self, mask, skip_long_term_update=False):
         if mask is None:
             raise ValueError("Cannot update memory without a mask.")
 
-        mask = np.asarray(mask)
+        if not isinstance(mask, torch.Tensor):
+            mask = torch.tensor(mask, device=self.device, dtype=torch.uint8)
 
         if mask.ndim != 2:
             raise ValueError("Memory mask must be a 2D label mask.")
@@ -155,9 +154,8 @@ class Pipeline:
             skip_long_term_update=skip_long_term_update,
         )
 
-        self.current_mask = mask.copy()
+        self.current_mask = mask.clone()
         obj_num = self.get_obj_num()
-
         self.curr_idx = max(self.curr_idx, obj_num + 1)
 
     def restart_tracker(self):
@@ -171,9 +169,14 @@ class Pipeline:
     # ------------------------------------------------------------------
 
     def render(self, frame, mask):
-        frame = draw_mask(frame, mask)
-        frame = draw_outline(mask, frame)
-        return frame
+        # Push frame to device once
+        if not isinstance(frame, torch.Tensor):
+            frame = torch.from_numpy(frame).to(self.device)
+
+        rendered = draw_mask(frame, mask)
+
+        # ONE D2H transfer: Pull the finished frame back to CPU for OpenCV/UI
+        return rendered.cpu().numpy().astype(np.uint8)
 
     # ------------------------------------------------------------------
     # Interactive segmentation
@@ -190,15 +193,17 @@ class Pipeline:
             return self.get_current_mask(), origin_frame
 
         if self.current_mask is None:
-            self.current_mask = np.zeros(
-                interactive_masks[0].shape,
-                dtype=np.uint8,
-            )
+            # Create zeros directly on GPU
+            mask_shape = interactive_masks[0].shape
+            self.current_mask = torch.zeros(mask_shape, dtype=torch.uint8, device=self.device)
 
-        refined_mask = self.current_mask.copy()
+        refined_mask = self.current_mask.clone()
 
         for interactive_mask in interactive_masks:
-            if not np.any(interactive_mask):
+            if not isinstance(interactive_mask, torch.Tensor):
+                interactive_mask = torch.tensor(interactive_mask, device=self.device)
+                
+            if not torch.any(interactive_mask):
                 continue
 
             refined_mask[interactive_mask > 0] = self.curr_idx
@@ -229,12 +234,13 @@ class Pipeline:
         )
 
         if self.current_mask is None:
-            self.current_mask = np.zeros(
-                origin_frame.shape[:2],
-                dtype=np.uint8,
+            self.current_mask = torch.zeros(
+                origin_frame.shape[:2], 
+                dtype=torch.uint8, 
+                device=self.device
             )
 
-        refined_mask = self.current_mask.copy()
+        refined_mask = self.current_mask.clone()
         frame_area = origin_frame.shape[0] * origin_frame.shape[1]
 
         for bbox in boxes:
@@ -245,8 +251,11 @@ class Pipeline:
                 continue
 
             interactive_mask = self.segmentor.segment_box(origin_frame, bbox)
+            
+            if not isinstance(interactive_mask, torch.Tensor):
+                interactive_mask = torch.tensor(interactive_mask, device=self.device)
 
-            if not np.any(interactive_mask):
+            if not torch.any(interactive_mask):
                 continue
 
             refined_mask[interactive_mask > 0] = self.curr_idx
@@ -293,17 +302,17 @@ class Pipeline:
                 frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
                 if first_frame:
-                    pred_mask = self.get_current_mask()
+                    pred_mask_tensor = self.get_current_mask()
                     first_frame = False
                 else:
-                    pred_mask = self.track_and_update(frame_rgb)
+                    pred_mask_tensor = self.track_and_update(frame_rgb)
 
-                if pred_mask is None:
+                if pred_mask_tensor is None:
                     continue
 
-                masked_frame = self.render(frame_rgb, pred_mask)
+                masked_frame_np = self.render(frame_rgb, pred_mask_tensor)
 
-                yield masked_frame, curr_frame_idx
+                yield masked_frame_np, curr_frame_idx
 
     # ------------------------------------------------------------------
     # Frame source
