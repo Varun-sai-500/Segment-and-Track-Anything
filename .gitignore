@@ -8,6 +8,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
+/.gradio
 dist/
 downloads/
 eggs/

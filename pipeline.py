@@ -15,8 +15,8 @@ from mask_utils import draw_mask
 
 class Pipeline:
     def __init__(self, sam_args, dino_args, deaot_args):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
+        self.device = sam_args["device"]
         self.segmentor = Segmentor(sam_args)
         self.tracker = Tracker(deaot_args)
         self.detector = Detector(dino_args)
