@@ -468,4 +468,4 @@ def app():
 
 if __name__ == "__main__":
     demo = app()
-    demo.queue().launch(css=CUSTOM_CSS, debug=True, share=False)
+    demo.queue().launch(css=CUSTOM_CSS, debug=True, server_name="0.0.0.0", server_port=7860, share=True)
