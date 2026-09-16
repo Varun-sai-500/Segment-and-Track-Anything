@@ -5,6 +5,7 @@ import zipfile
 import cv2
 import gradio as gr
 import numpy as np
+import torch
 
 from model_args import deaot_args, dino_args, sam_args
 from pipeline import Pipeline
@@ -13,17 +14,11 @@ from pipeline import Pipeline
 # Pipeline Helpers & State Reset
 # ------------------------------------------------------------------
 
-
-def ensure_pipeline(tracker):
-    return tracker if tracker is not None else Pipeline(sam_args, dino_args, deaot_args)
-
-
 def draw_points(points, modes, frame):
     for (x, y), mode in zip(points, modes):
         color = (0, 153, 255) if mode == 1 else (255, 80, 80)
         cv2.circle(frame, (int(x), int(y)), 8, color, -1)
     return frame
-
 
 def reset_state(tracker, output_path=None):
     if tracker is not None:
@@ -35,7 +30,6 @@ def reset_state(tracker, output_path=None):
 # ------------------------------------------------------------------
 # Input Processing
 # ------------------------------------------------------------------
-
 
 def get_meta_from_video(input_video, tracker, output_path):
     if input_video is None:
@@ -93,23 +87,31 @@ def _get_existing_mask(tracker):
 
 
 def _commit_segmentation(tracker, reference_frame, predicted_mask, frame_idx, previous_mask):
-    if predicted_mask is None or not np.any(predicted_mask):
+    if predicted_mask is None or not torch.any(predicted_mask):
         return
 
-    predicted_mask = np.asarray(predicted_mask)
     if previous_mask is None:
         tracker.initialize_reference(reference_frame, predicted_mask, frame_step=frame_idx)
         return
 
-    prev_ids = set(np.unique(previous_mask)) - {0}
-    curr_ids = set(np.unique(predicted_mask)) - {0}
+    # Extract unique IDs on GPU and convert small ID sets to Python lists (near-zero overhead)
+    prev_ids = set(torch.unique(previous_mask).cpu().tolist()) - {0}
+    curr_ids = set(torch.unique(predicted_mask).cpu().tolist()) - {0}
     new_ids = curr_ids - prev_ids
 
     if new_ids:
-        new_objects_mask = np.where(np.isin(predicted_mask, list(new_ids)), predicted_mask, 0).astype(np.uint8)
-        if np.any(new_objects_mask):
+        # Construct new objects mask on GPU using torch.isin and torch.where
+        new_ids_tensor = torch.tensor(list(new_ids), device=predicted_mask.device)
+        mask_isin = torch.isin(predicted_mask, new_ids_tensor)
+        
+        new_objects_mask = torch.where(
+            mask_isin,
+            predicted_mask,
+            torch.tensor(0, device=predicted_mask.device, dtype=predicted_mask.dtype)
+        )
+        
+        if torch.any(new_objects_mask):
             tracker.add_objects(mask=new_objects_mask, frame_step=frame_idx)
-
 
 def execute_segmentation(tracker, origin_frame, ref_frame, coords, modes, c_groups, m_groups, frame_idx):
     if origin_frame is None:
@@ -121,8 +123,10 @@ def execute_segmentation(tracker, origin_frame, ref_frame, coords, modes, c_grou
 
     if not c_groups:
         return tracker, origin_frame, origin_frame, [], [], [], []
-
-    tracker = ensure_pipeline(tracker)
+    
+    if tracker is None:
+        tracker = Pipeline(sam_args, dino_args, deaot_args) 
+        
     prev_mask = _get_existing_mask(tracker)
     pred_mask, masked_frame = tracker.seg_acc_click(
         origin_frame=origin_frame, coords_groups=c_groups, modes_groups=m_groups
@@ -135,8 +139,10 @@ def execute_segmentation(tracker, origin_frame, ref_frame, coords, modes, c_grou
 def gd_detect(tracker, origin_frame, ref_frame, caption, box_thresh, text_thresh, frame_idx):
     if origin_frame is None or not caption:
         return tracker, origin_frame, origin_frame
-
-    tracker = ensure_pipeline(tracker)
+    
+    if tracker is None:
+        tracker = Pipeline(sam_args, dino_args, deaot_args) 
+        
     prev_mask = _get_existing_mask(tracker)
     pred_mask, masked_frame = tracker.detect_and_seg(origin_frame, caption, box_thresh, text_thresh)
 
@@ -459,7 +465,6 @@ def app():
         reset_btn.click(lambda: (None, "Ready", gr.update(interactive=True)), None, [output_file, status, canvas], queue=False)
 
     return demo
-
 
 if __name__ == "__main__":
     demo = app()
