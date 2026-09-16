@@ -1,68 +1,64 @@
-import cv2
-import numpy as np
 import torch
+import torch.nn.functional as F
+
 
 class MultiRestrictSize:
-    def __init__(self):
-        self.max_long_edge = 1040
+    def __init__(self, max_long_edge: int = 1040, antialias: bool = False):
+        self.max_long_edge = max_long_edge
+        self.antialias = antialias
 
     def __call__(self, sample):
-        image = sample["current_img"]
-
+        image = sample["current_img"]  # (H, W, 3)
         h, w = image.shape[:2]
         new_h, new_w = h, w
 
         long_edge = max(h, w)
-
         if long_edge > self.max_long_edge:
             scale = self.max_long_edge / long_edge
             new_h = int(h * scale)
             new_w = int(w * scale)
 
         if (new_h - 1) % 16 != 0:
-            new_h = int(
-                np.around((new_h - 1) / 16) * 16 + 1
-            )
-
+            new_h = int(round((new_h - 1) / 16) * 16 + 1)
         if (new_w - 1) % 16 != 0:
-            new_w = int(
-                np.around((new_w - 1) / 16) * 16 + 1
-            )
+            new_w = int(round((new_w - 1) / 16) * 16 + 1)
 
         if new_h != h or new_w != w:
+            img_t = image.permute(2, 0, 1).unsqueeze(0).float()  # (1, 3, H, W)
+            resized = F.interpolate(
+                img_t, size=(new_h, new_w),
+                mode='bicubic', align_corners=False,
+                antialias=self.antialias,
+            )
+            resized = resized.squeeze(0).permute(1, 2, 0)  # (H, W, 3)
+
+            if image.dtype == torch.uint8:
+                resized = resized.clamp(0, 255).to(torch.uint8)
+            else:
+                resized = resized.to(image.dtype)
+
             sample = {
-                "current_img": cv2.resize(
-                    image,
-                    (new_w, new_h),
-                    interpolation=cv2.INTER_CUBIC,
-                ),
-                "current_label": sample.get(
-                    "current_label"
-                ),
+                "current_img": resized,
+                "current_label": sample.get("current_label"),
             }
 
         return [sample]
 
 
 class MultiToTensor:
+    def __init__(self):
+        self.mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        self.std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+
     def __call__(self, samples):
         for sample in samples:
-            image = sample["current_img"]
-            image = image.astype(np.float32) / 255.0
-            image -= (0.485, 0.456, 0.406)
-            image /= (0.229, 0.224, 0.225)
+            image = sample["current_img"].float() / 255.0
+            image = image.permute(2, 0, 1)  # HWC -> CHW
+            image = (image - self.mean.to(image.device)) / self.std.to(image.device)
+            sample["current_img"] = image
 
-            image = image.transpose(2, 0, 1)
-            sample["current_img"] = torch.from_numpy(image)
-
-            if sample.get("current_label") is not None:
-                label = sample["current_label"]
-
-                label = label[:, :, np.newaxis]
-                label = label.transpose(2, 0, 1)
-
-                sample["current_label"] = (
-                    torch.from_numpy(label).int()
-                )
+            label = sample.get("current_label")
+            if label is not None:
+                sample["current_label"] = label.unsqueeze(0).int()  # (H,W) -> (1,H,W)
 
         return samples
