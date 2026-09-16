@@ -167,7 +167,10 @@ class Tracker:
 
     def _prepare_reference(self, frame, mask):
         self._validate_mask_object_ids(mask)
-
+        
+        if not isinstance(frame, torch.Tensor):
+            frame = torch.from_numpy(frame)
+            
         sample = self._transform({
             "current_img": frame,
             "current_label": mask,
@@ -281,6 +284,9 @@ class Tracker:
         self._require_initialized()
 
         output_size = image.shape[:2]
+        
+        if not isinstance(image, torch.Tensor):
+            image = torch.from_numpy(image)
 
         sample = self._transform({
             "current_img": image,
