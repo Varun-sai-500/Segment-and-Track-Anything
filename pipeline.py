@@ -26,7 +26,7 @@ class Pipeline:
 
         self._stop_event = threading.Event()
 
-        print(f"Pipeline initialized successfully on " f"{self.device}.")
+        print(f"Pipeline initialized successfully on {self.device}.")
 
     # ------------------------------------------------------------------
     # State
@@ -65,6 +65,7 @@ class Pipeline:
             if frame.device.type != self.device:
                 return frame.to(self.device, non_blocking=True)
             return frame
+
         if not isinstance(frame, np.ndarray):
             raise TypeError("frame must be a NumPy array or Torch tensor.")
 
@@ -78,6 +79,9 @@ class Pipeline:
             raise TypeError("mask must be a NumPy array or Torch tensor.")
 
         return torch.as_tensor(mask, dtype=torch.uint8, device=self.device)
+
+    def _tensor_to_numpy(self, tensor):
+        return tensor.cpu().numpy().astype(np.uint8)
 
     # ------------------------------------------------------------------
     # Object bookkeeping
@@ -124,7 +128,7 @@ class Pipeline:
             raise ValueError("Cannot add objects without a mask.")
 
         if self.current_mask is None:
-            raise RuntimeError("Cannot add objects before the tracker " "is initialized.")
+            raise RuntimeError("Cannot add objects before the tracker is initialized.")
 
         mask = self._mask_to_device(mask)
 
@@ -195,30 +199,21 @@ class Pipeline:
 
     def render(self, frame, mask):
         if not isinstance(frame, torch.Tensor):
-            raise TypeError(
-                "render() expects a device tensor."
-            )
+            raise TypeError("frame must be a torch.Tensor")
 
         if not isinstance(mask, torch.Tensor):
-            raise TypeError(
-                "render() expects a device mask tensor."
-            )
+            raise TypeError("mask must be a torch.Tensor")
 
         if frame.device.type != self.device:
-            raise RuntimeError(
-                f"frame is on {frame.device}, "
-                f"expected {self.device}"
-            )
+            raise RuntimeError(f"frame is on {frame.device}, expected {self.device}")
 
         if mask.device != frame.device:
-            raise RuntimeError(
-                f"mask is on {mask.device}, "
-                f"expected {frame.device}"
-            )
+            raise RuntimeError(f"mask is on {mask.device}, expected {frame.device}")
 
-        rendered = draw_mask(frame, mask)
+        # GPU-native.
+        # Do NOT convert to NumPy here.
+        return draw_mask(frame, mask)
 
-        return rendered.cpu().numpy().astype(np.uint8)
     # ------------------------------------------------------------------
     # Interactive segmentation
     # ------------------------------------------------------------------
@@ -243,7 +238,6 @@ class Pipeline:
                 continue
 
             refined_mask[interactive_mask > 0] = self.curr_idx
-
             self.curr_idx += 1
 
         self.current_mask = refined_mask
@@ -252,7 +246,10 @@ class Pipeline:
 
         masked_frame = self.render(frame_tensor, refined_mask)
 
-        return refined_mask, masked_frame
+        # Gradio boundary: CUDA -> CPU NumPy.
+        masked_frame_np = self._tensor_to_numpy(masked_frame)
+
+        return refined_mask, masked_frame_np
 
     # ------------------------------------------------------------------
     # Detection + segmentation
@@ -270,6 +267,7 @@ class Pipeline:
 
         for bbox in boxes:
             x0, y0, x1, y1 = bbox
+
             bbox_area = (x1 - x0) * (y1 - y0)
 
             if bbox_area > (frame_area * box_size_threshold):
@@ -283,7 +281,6 @@ class Pipeline:
                 continue
 
             refined_mask[interactive_mask > 0] = self.curr_idx
-
             self.curr_idx += 1
 
         self.current_mask = refined_mask
@@ -292,7 +289,10 @@ class Pipeline:
 
         masked_frame = self.render(frame_tensor, refined_mask)
 
-        return refined_mask, masked_frame
+        # Gradio boundary: CUDA -> CPU NumPy.
+        masked_frame_np = self._tensor_to_numpy(masked_frame)
+
+        return refined_mask, masked_frame_np
 
     # ------------------------------------------------------------------
     # Video tracking generator
@@ -316,9 +316,10 @@ class Pipeline:
                 if self._stop_event.is_set():
                     break
 
+                # CPU input boundary.
                 frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
-                # NumPy -> Torch -> device happens once here.
+                # Single CPU -> GPU transfer.
                 frame_tensor = self._frame_to_device(frame_rgb)
 
                 if first_frame:
@@ -327,7 +328,11 @@ class Pipeline:
                 else:
                     pred_mask_tensor = self.track_and_update(frame_tensor)
 
-                masked_frame_np = self.render(frame_tensor, pred_mask_tensor)
+                # GPU-native rendering.
+                rendered = self.render(frame_tensor, pred_mask_tensor)
+
+                # Output boundary.
+                masked_frame_np = self._tensor_to_numpy(rendered)
 
                 yield (masked_frame_np, curr_frame_idx)
 
@@ -346,9 +351,7 @@ class Pipeline:
                 return
 
             fps = cap.get(cv2.CAP_PROP_FPS) or default_fps
-
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
             if frame_num > 0:
