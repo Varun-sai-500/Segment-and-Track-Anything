@@ -35,7 +35,7 @@ def load_network(net, repo_id, model_filename, device):
 
 class Tracker:
     def __init__(self, deaot_args):
-        self.device = torch.device(deaot_args["device"])
+        self.device = deaot_args["device"]
 
         self.repo_id = deaot_args["repo_id"]
         self.model_filename = deaot_args["model_filename"]
@@ -158,6 +158,14 @@ class Tracker:
                 "Mask contains negative object IDs."
             )
 
+    def _validate_frame(self, frame):
+        if not isinstance(frame, torch.Tensor):
+            raise TypeError("frame must be a Torch tensor")
+
+        if frame.device.type != self.device:
+            raise RuntimeError(
+                f"frame is on {frame.device}, expected {self.device}"
+            )
     # ------------------------------------------------------------------
     # Preprocessing
     # ------------------------------------------------------------------
@@ -169,6 +177,7 @@ class Tracker:
         return sample
 
     def _prepare_reference(self, frame, mask):
+        self._validate_frame(frame)
         self._validate_mask_object_ids(mask)      
         sample = self._transform({
             "current_img": frame,
@@ -194,7 +203,7 @@ class Tracker:
     def _prepare_mask(self, mask):
         self._validate_mask_object_ids(mask)
 
-        if mask.device != self.device:
+        if mask.device.type != torch.device(self.device).type:
             raise RuntimeError(
                 f"mask is on {mask.device}, expected {self.device}"
             )
@@ -275,6 +284,7 @@ class Tracker:
     @torch.no_grad()
     def _track(self, image, update_memory=False):
         self._require_initialized()
+        self._validate_frame(image)
 
         output_size = image.shape[:2]
         sample = self._transform({
