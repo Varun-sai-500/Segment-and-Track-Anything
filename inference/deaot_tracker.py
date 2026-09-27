@@ -35,7 +35,7 @@ def load_network(net, repo_id, model_filename, device):
 
 class Tracker:
     def __init__(self, deaot_args):
-        self.device = deaot_args["device"]
+        self.device = torch.device(deaot_args["device"])
 
         self.repo_id = deaot_args["repo_id"]
         self.model_filename = deaot_args["model_filename"]
@@ -55,7 +55,7 @@ class Tracker:
 
         self.transforms = (
             tr.MultiRestrictSize(),
-            tr.MultiToTensor(),
+            tr.MultiToTensor(self.device),
         )
 
     # ------------------------------------------------------------------
@@ -133,8 +133,11 @@ class Tracker:
     def _validate_mask_object_ids(self, mask):
         if mask is None:
             return
+        
+        if not isinstance(mask, torch.Tensor):
+            raise TypeError("mask must be a torch.Tensor")
 
-        mask_tensor = torch.as_tensor(mask)
+        mask_tensor = mask
 
         if mask_tensor.numel() == 0:
             raise ValueError(
@@ -166,28 +169,18 @@ class Tracker:
         return sample
 
     def _prepare_reference(self, frame, mask):
-        self._validate_mask_object_ids(mask)
-        
-        if not isinstance(frame, torch.Tensor):
-            frame = torch.from_numpy(frame)
-            
+        self._validate_mask_object_ids(mask)      
         sample = self._transform({
             "current_img": frame,
             "current_label": mask,
         })
 
-        frame = (
-            sample[0]["current_img"]
-            .unsqueeze(0)
-            .float()
-            .to(self.device)
-        )
+        frame = (sample[0]["current_img"].unsqueeze(0))
 
         mask = (
             sample[0]["current_label"]
             .unsqueeze(0)
             .float()
-            .to(self.device)
         )
 
         mask = F.interpolate(
@@ -201,11 +194,12 @@ class Tracker:
     def _prepare_mask(self, mask):
         self._validate_mask_object_ids(mask)
 
-        mask = torch.as_tensor(
-            mask,
-            dtype=torch.float32,
-            device=self.device,
-        )
+        if mask.device != self.device:
+            raise RuntimeError(
+                f"mask is on {mask.device}, expected {self.device}"
+            )
+
+        mask = mask.float()
 
         if mask.ndim == 2:
             mask = mask.unsqueeze(0).unsqueeze(0)
@@ -229,7 +223,6 @@ class Tracker:
             )
 
         return mask
-
     # ------------------------------------------------------------------
     # Tracker initialization
     # ------------------------------------------------------------------
@@ -284,20 +277,11 @@ class Tracker:
         self._require_initialized()
 
         output_size = image.shape[:2]
-        
-        if not isinstance(image, torch.Tensor):
-            image = torch.from_numpy(image)
-
         sample = self._transform({
             "current_img": image,
         })
 
-        image_tensor = (
-            sample[0]["current_img"]
-            .unsqueeze(0)
-            .float()
-            .to(self.device)
-        )
+        image_tensor = (sample[0]["current_img"].unsqueeze(0))
 
         self.engine.match_propogate_one_frame(image_tensor)
 
