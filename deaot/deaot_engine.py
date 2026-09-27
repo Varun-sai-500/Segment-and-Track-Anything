@@ -9,7 +9,7 @@ def one_hot_mask(mask, cls_num):
     if mask.dim() == 3:
         mask = mask.unsqueeze(1)
 
-    indices = torch.arange(cls_num + 1).view(1, -1, 1, 1)
+    indices = torch.arange(cls_num + 1,device=mask.device).view(1, -1, 1, 1)
 
     return (mask == indices).float()
 
