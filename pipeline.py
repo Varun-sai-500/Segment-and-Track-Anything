@@ -15,7 +15,7 @@ from mask_utils import draw_mask
 
 class Pipeline:
     def __init__(self, sam_args, dino_args, deaot_args):
-        self.device = torch.device(sam_args["device"])
+        self.device = sam_args["device"]
 
         self.segmentor = Segmentor(sam_args)
         self.tracker = Tracker(deaot_args)
@@ -62,10 +62,9 @@ class Pipeline:
 
     def _frame_to_device(self, frame):
         if isinstance(frame, torch.Tensor):
-            if frame.device != self.device:
+            if frame.device.type != self.device:
                 return frame.to(self.device, non_blocking=True)
             return frame
-
         if not isinstance(frame, np.ndarray):
             raise TypeError("frame must be a NumPy array or Torch tensor.")
 
@@ -196,21 +195,30 @@ class Pipeline:
 
     def render(self, frame, mask):
         if not isinstance(frame, torch.Tensor):
-            raise TypeError("render() expects a device tensor.")
+            raise TypeError(
+                "render() expects a device tensor."
+            )
 
         if not isinstance(mask, torch.Tensor):
-            raise TypeError("render() expects a device mask tensor.")
+            raise TypeError(
+                "render() expects a device mask tensor."
+            )
 
-        if frame.device != self.device:
-            raise RuntimeError(f"frame is on {frame.device}, " f"expected {self.device}")
+        if frame.device.type != self.device:
+            raise RuntimeError(
+                f"frame is on {frame.device}, "
+                f"expected {self.device}"
+            )
 
         if mask.device != frame.device:
-            raise RuntimeError(f"mask is on {mask.device}, " f"expected {frame.device}")
+            raise RuntimeError(
+                f"mask is on {mask.device}, "
+                f"expected {frame.device}"
+            )
 
         rendered = draw_mask(frame, mask)
 
         return rendered.cpu().numpy().astype(np.uint8)
-
     # ------------------------------------------------------------------
     # Interactive segmentation
     # ------------------------------------------------------------------
