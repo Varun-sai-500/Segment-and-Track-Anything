@@ -25,22 +25,11 @@ class MultiRestrictSize:
 
         if new_h != h or new_w != w:
             img_t = image.permute(2, 0, 1).unsqueeze(0).float()  # (1, 3, H, W)
-            resized = F.interpolate(
-                img_t, size=(new_h, new_w),
-                mode='bicubic', align_corners=False,
-                antialias=self.antialias,
-            )
+            resized = F.interpolate(img_t, size=(new_h, new_w), mode="bicubic", align_corners=False, antialias=self.antialias)
             resized = resized.squeeze(0).permute(1, 2, 0)  # (H, W, 3)
+            resized = resized.clamp(0, 255).to(torch.uint8)
 
-            if image.dtype == torch.uint8:
-                resized = resized.clamp(0, 255).to(torch.uint8)
-            else:
-                resized = resized.to(image.dtype)
-
-            sample = {
-                "current_img": resized,
-                "current_label": sample.get("current_label"),
-            }
+            sample = {"current_img": resized, "current_label": sample.get("current_label")}
 
         return [sample]
 
@@ -54,7 +43,7 @@ class MultiToTensor:
         for sample in samples:
             image = sample["current_img"].float() / 255.0
             image = image.permute(2, 0, 1)  # HWC -> CHW
-            image = (image - self.mean.to(image.device)) / self.std.to(image.device)
+            image = (image - self.mean) / self.std
             sample["current_img"] = image
 
             label = sample.get("current_label")

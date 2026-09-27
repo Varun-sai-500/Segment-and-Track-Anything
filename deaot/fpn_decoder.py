@@ -1,7 +1,8 @@
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 from deaot.ops import ConvGN
+
 
 class FPNSegmentationHead(nn.Module):
     def __init__(self):
@@ -24,36 +25,14 @@ class FPNSegmentationHead(nn.Module):
 
         x = F.relu_(self.conv_in(x))
 
-        x = F.relu_(
-            self.conv_16x(
-                self.adapter_16x(shortcuts[-2]) + x
-            )
-        )
+        x = F.relu_(self.conv_16x(self.adapter_16x(shortcuts[-2]) + x))
 
-        x = F.interpolate(
-            x,
-            size=shortcuts[-3].size()[-2:],
-            mode="bilinear",
-            align_corners=True,
-        )
+        x = F.interpolate(x, size=shortcuts[-3].size()[-2:], mode="bilinear", align_corners=True)
 
-        x = F.relu_(
-            self.conv_8x(
-                self.adapter_8x(shortcuts[-3]) + x
-            )
-        )
+        x = F.relu_(self.conv_8x(self.adapter_8x(shortcuts[-3]) + x))
 
-        x = F.interpolate(
-            x,
-            size=shortcuts[-4].size()[-2:],
-            mode="bilinear",
-            align_corners=True,
-        )
+        x = F.interpolate(x, size=shortcuts[-4].size()[-2:], mode="bilinear", align_corners=True)
 
-        x = F.relu_(
-            self.conv_4x(
-                self.adapter_4x(shortcuts[-4]) + x
-            )
-        )
+        x = F.relu_(self.conv_4x(self.adapter_4x(shortcuts[-4]) + x))
 
         return self.conv_out(x)
