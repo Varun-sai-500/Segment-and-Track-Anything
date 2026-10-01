@@ -29,28 +29,39 @@ class MultiRestrictSize:
 
             resized = F.interpolate(img_t, size=(new_h, new_w), mode="bicubic", align_corners=False, antialias=self.antialias)
 
-            resized = resized.squeeze(0).permute(1, 2, 0).clamp(0, 255).to(torch.uint8)
+            resized = resized.squeeze(0).permute(1, 2, 0).clamp(0, 255)
 
             sample = {"current_img": resized, "current_label": sample.get("current_label")}
 
         return [sample]
 
-
 class MultiToTensor:
     def __init__(self, device):
-        self.mean = torch.tensor([0.485, 0.456, 0.406], device=device).view(3, 1, 1)
+        self.mean = torch.tensor(
+            [0.485, 0.456, 0.406],
+            device=device,
+        ).view(3, 1, 1)
 
-        self.std = torch.tensor([0.229, 0.224, 0.225], device=device).view(3, 1, 1)
+        self.std = torch.tensor(
+            [0.229, 0.224, 0.225],
+            device=device,
+        ).view(3, 1, 1)
 
     def __call__(self, samples):
         for sample in samples:
-            image = sample["current_img"].float() / 255.0
+            image = sample["current_img"]
+
+            if image.dtype == torch.uint8:
+                image = image.float().div_(255.0)
+            else:
+                image = image.div_(255.0)
+
             image = image.permute(2, 0, 1)
-            image = (image - self.mean) / self.std
+            image = image.sub_(self.mean).div_(self.std)
+
             sample["current_img"] = image
 
             label = sample.get("current_label")
-
             if label is not None:
                 sample["current_label"] = label.unsqueeze(0).int()
 
