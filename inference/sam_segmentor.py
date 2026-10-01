@@ -1,31 +1,28 @@
-import numpy as np
 import torch
 from contextlib import nullcontext
 from transformers import SamModel, SamProcessor
 
 def _autocast_context(device):
-    if device.startswith("cuda"):
-        if (
-            torch.cuda.is_available()
-            and torch.cuda.is_bf16_supported()
-        ):
+    if torch.cuda.is_available():
+        if (torch.cuda.is_bf16_supported()):
             return torch.amp.autocast(
                 device_type="cuda",
                 dtype=torch.bfloat16,
             )
-
-    elif device.startswith("mps"):
-        if torch.backends.mps.is_available():
-            return torch.amp.autocast(
-                device_type="mps",
-                dtype=torch.bfloat16,
-            )
+        return torch.amp.autocast(
+            device_type="cuda",
+            dtype=torch.float16,
+        )
+    elif device.startswith("mps") and torch.backends.mps.is_available():
+        return torch.amp.autocast(
+            device_type="mps",
+            dtype=torch.float16,
+        )
 
     return nullcontext()
 
 
 class Segmentor:
-
     def __init__(self, sam_args):
         self.device = sam_args["device"]
         self.model_id = sam_args["model_id"]
@@ -37,63 +34,31 @@ class Segmentor:
         if self.model is None:
             print(f"Loading SAM model: {self.model_id}")
 
-            self.processor = SamProcessor.from_pretrained(
-                self.model_id
-            )
-
-            self.model = (
-                SamModel.from_pretrained(
-                    self.model_id
-                )
-                .to(self.device)
-            )
-
+            self.processor = SamProcessor.from_pretrained(self.model_id)
+            self.model = (SamModel.from_pretrained(self.model_id).to(self.device))
             self.model.eval()
-
+            
     def _move_inputs(self, inputs):
-        return {
-            key: value.to(self.device)
-            if torch.is_tensor(value)
-            else value
-            for key, value in inputs.items()
+        metadata_keys = {
+            "original_sizes",
+            "reshaped_input_sizes",
         }
 
+        for key, value in inputs.items():
+            if torch.is_tensor(value) and key not in metadata_keys:
+                inputs[key] = value.to(self.device)
+
+        return inputs
+
+
     def _post_process(self, outputs, inputs):
-        """
-        Move SAM outputs/metadata to CPU once and restore masks
-        to their original image dimensions.
-        """
-        pred_masks = outputs.pred_masks.cpu()
-        iou_scores = outputs.iou_scores.cpu()
-
-        original_sizes = inputs[
-            "original_sizes"
-        ].cpu()
-
-        reshaped_input_sizes = inputs[
-            "reshaped_input_sizes"
-        ].cpu()
-
-        masks = (
-            self.processor
-            .image_processor
-            .post_process_masks(
-                pred_masks,
-                original_sizes,
-                reshaped_input_sizes,
-            )
+        return self.processor.image_processor.post_process_masks(
+            outputs.pred_masks,
+            inputs["original_sizes"],
+            inputs["reshaped_input_sizes"],
         )
-
-        return masks, iou_scores
-
     @torch.inference_mode()
-    def segment_points_multi(
-        self,
-        origin_frame,
-        coords_groups,
-        modes_groups,
-        multimask=False,
-    ):
+    def segment_points_multi(self, origin_frame, coords_groups, modes_groups):
         """
         Segment multiple independently prompted objects in one SAM
         forward pass.
@@ -180,39 +145,19 @@ class Segmentor:
         with _autocast_context(self.device):
             outputs = self.model(
                 **inputs,
-                multimask_output=multimask,
+                multimask_output=False,
             )
 
-        masks, scores = self._post_process(
-            outputs,
-            inputs,
-        )
-
-        masks = masks[0]
-        scores = scores[0]
-
-        interactive_masks = []
-
-        for i in range(len(coords_groups)):
-            best_idx = torch.argmax(
-                scores[i]
-            ).item()
-
-            interactive_masks.append(
-                masks[i, best_idx]
-                .numpy()
-                .astype(np.uint8)
-            )
+        masks = self._post_process(outputs, inputs)[0]
+        interactive_masks = [
+            masks[i, 0]
+            for i in range(len(coords_groups))
+        ]
 
         return interactive_masks
 
     @torch.inference_mode()
-    def segment_box(
-        self,
-        origin_frame,
-        bbox,
-        multimask=False,
-    ):
+    def segment_box(self, origin_frame, bbox):
         """
         Segment an object using a bounding-box prompt.
 
@@ -244,21 +189,12 @@ class Segmentor:
         with _autocast_context(self.device):
             outputs = self.model(
                 **inputs,
-                multimask_output=multimask,
+                multimask_output=False,
             )
 
-        masks, scores = self._post_process(
+        masks = self._post_process(
             outputs,
             inputs,
-        )
+        )[0]
 
-        masks = masks[0][0]
-        scores = scores[0, 0]
-
-        best_idx = torch.argmax(scores).item()
-
-        return (
-            masks[best_idx]
-            .numpy()
-            .astype(np.uint8)
-        )
+        return masks[0, 0]
